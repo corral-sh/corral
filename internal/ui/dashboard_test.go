@@ -182,3 +182,37 @@ func TestOpProgressReachesBusyLog(t *testing.T) {
 		t.Fatal("opDoneMsg must clear the busy state")
 	}
 }
+
+// While an operation runs, state-changing keys stay blocked but `l` must open
+// the log pane in follow mode — the box's log is being written at exactly that
+// moment, so the pane is the natural way to trail a start/stop.
+func TestLogPaneOpensDuringOperation(t *testing.T) {
+	src := DashboardSource{
+		Logs: func(context.Context, BoxRow) (string, error) { return "boot line", nil },
+	}
+	row := BoxRow{Name: "b", Status: "Stopped", Project: "/p"}
+	m := &dashModel{src: src, ctx: context.Background(), width: 120, height: 30,
+		rows: []BoxRow{row}, busy: "starting b"}
+
+	if !strings.Contains(m.View(), "l full log") {
+		t.Error("busy view must hint that the log pane is available")
+	}
+	mod, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	m = mod.(*dashModel)
+	if m.confirm != "" || m.busy != "starting b" {
+		t.Fatal("state-changing keys must stay blocked while busy")
+	}
+	mod, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'l'}})
+	m = mod.(*dashModel)
+	if m.logs == nil || cmd == nil {
+		t.Fatal("l while busy must open the log pane and schedule the fetch/tick")
+	}
+	if !m.logs.follow {
+		t.Error("a pane opened during an operation must follow, so it trails the log")
+	}
+	mod, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = mod.(*dashModel)
+	if m.logs != nil || m.busy != "starting b" {
+		t.Error("esc must return to the busy view, with the operation still running")
+	}
+}

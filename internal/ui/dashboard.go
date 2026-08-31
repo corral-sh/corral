@@ -366,8 +366,18 @@ func (m *dashModel) mergeRows(rows []BoxRow) {
 
 func (m *dashModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.busy != "" {
-		if msg.String() == "ctrl+c" {
+		switch msg.String() {
+		case "ctrl+c":
 			return m, tea.Quit
+		case "l":
+			// Every state-changing key is blocked while an operation runs, but
+			// the log pane is read-only — and the box's log is being written
+			// right now, so open it in follow mode to trail the operation.
+			if row, ok := m.selected(); ok && m.src.Logs != nil {
+				cmd := m.openLogs(row)
+				m.logs.follow = true
+				return m, tea.Batch(cmd, logsTickEvery())
+			}
 		}
 		return m, nil
 	}
@@ -512,6 +522,9 @@ func (m *dashModel) View() string {
 		sb.WriteString("  " + Warn.Render("⏳ "+m.busy+"…") + "\n")
 		for _, l := range m.busyLog {
 			sb.WriteString("    " + Subtle.Render(l) + "\n")
+		}
+		if m.src.Logs != nil {
+			sb.WriteString("    " + Subtle.Render("l full log") + "\n")
 		}
 	case m.confirm == "delete":
 		row, _ := m.selected()

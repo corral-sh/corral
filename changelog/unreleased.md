@@ -4,7 +4,7 @@
 
 ### Added
 
-- Contributor workflow: issue forms with status labels, a pull request template, a Code of Conduct, Dependabot, and an issue-first process documented in CONTRIBUTING.md.
+- Contributor workflow: issue forms with status labels, a pull request template, a Code of Conduct, Dependabot, and an issue-first process documented in CONTRIBUTING.md. `main` is protected: every change lands via pull request with all CI checks green, so a work item is never closed by a broken build.
 
 ### Changed
 

@@ -1,0 +1,38 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: standard
+  enable:
+    - gosec          # security: shell/exec, file perms, weak crypto, path traversal
+    - errorlint      # error wrapping / comparison mistakes
+    - bodyclose
+    - noctx
+    - errname
+    - misspell
+    - unconvert
+    - unparam
+    - nilerr
+    - copyloopvar
+  settings:
+    gosec:
+      excludes:
+        - G204   # subprocess launched with variable — this program's job is to run limactl/ssh with computed args
+        - G304   # file inclusion via variable — config/metadata paths are computed from our own state dir
+    errcheck:
+      exclude-functions:
+        - (io.Closer).Close
+        - (*os.File).Close
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters: [gosec, errcheck, unparam]
+
+formatters:
+  enable:
+    - gofmt

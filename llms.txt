@@ -1,0 +1,23 @@
+# Corral
+
+> Run AI coding agents (Claude Code today) at full speed inside a throwaway per-project Linux VM on macOS
+> (Lima + Apple Virtualization). The project is mounted at its real path; the Mac's home directory, SSH keys,
+> Keychain and other repositories are not there. A repository's own config can shape the guest but never
+> widen what the box reaches. Open source, Apache-2.0: https://github.com/corral-sh/corral
+
+Start with the feature catalog — one line per command, config key, mode and control, generated from the code.
+On a machine with the binary installed, `corral docs` (or `corral docs --json`) prints the same catalog.
+
+## Docs
+
+- [Feature catalog](docs/FEATURES.md): every command, config key (type, default, trust class), mode, guest control, toolchain, environment variable
+- [README](README.md): install, everyday commands, configuration, network/source/agent-state modes, toolchains, provision scripts
+- [SECURITY.md](docs/SECURITY.md): threat model, boundary table, what a repository can and cannot do, known gaps
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md): packages, box lifecycle, template rendering, egress broker design
+- [FEASIBILITY.md](docs/FEASIBILITY.md): why Lima; measured start times, memory behaviour, virtiofs costs
+- [CONTRIBUTING.md](CONTRIBUTING.md): dev setup, gates to run before a PR, how changes are reviewed
+- [Changelog](CHANGELOG.md): one file per release under changelog/
+
+## Optional
+
+- [CLAUDE.md](CLAUDE.md): conventions for contributors and coding agents working on this repository

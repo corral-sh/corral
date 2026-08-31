@@ -931,6 +931,7 @@ func TestSuppressedForwardEnvIsReported(t *testing.T) {
 // A session registered before the box exists is adopted by Create's
 // metadata, so a booting box is never idle to a concurrent sweep.
 func TestSessionBeforeMetadataIsAdopted(t *testing.T) {
+	t.Setenv("CORRAL_HOME", filepath.Join(t.TempDir(), "eb")) // SessionStart persists metadata — keep it out of the real home
 	old := pidAlive
 	t.Cleanup(func() { pidAlive = old })
 	pidAlive = func(int) bool { return true }

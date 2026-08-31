@@ -835,7 +835,7 @@ func newUpgradeCmd() *cobra.Command {
 			var err error
 			switch {
 			case strings.Contains(self, "/Cellar/"):
-				err = runVisible(ctx, "brew", "upgrade", "corral", "lima")
+				err = runVisible(ctx, "brew", "upgrade", "corral-sh/tap/corral", "lima")
 			default:
 				src := installSource()
 				if src == "" {
@@ -882,7 +882,7 @@ func newUninstallCmd() *cobra.Command {
 			if err := os.RemoveAll(h); err != nil {
 				return err
 			}
-			ui.Success(os.Stdout, "removed %s. Remove the binary with `brew uninstall corral` or `rm $(which corral)`.", ui.ShortenHome(h))
+			ui.Success(os.Stdout, "removed %s. Remove the binary with `brew uninstall corral-sh/tap/corral` or `rm $(which corral)`.", ui.ShortenHome(h))
 			return nil
 		},
 	}

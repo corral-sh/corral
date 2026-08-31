@@ -59,7 +59,7 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           test -f "changelog/$VERSION.md" || { echo "missing changelog/$VERSION.md"; exit 1; }
           cat "changelog/$VERSION.md" > release-notes.md
-          printf '\n## Install\n\n```\nbrew tap corral-sh/tap\nbrew trust corral-sh/tap\nbrew install corral\n```\n' >> release-notes.md
+          printf '\n## Install\n\n```\nbrew tap corral-sh/tap\nbrew trust corral-sh/tap\nbrew install corral-sh/tap/corral\n```\n' >> release-notes.md
           printf '\n## Verify a downloaded binary\n\n```\nminisign -Vm SHA256SUMS -p minisign.pub && shasum -a 256 -c SHA256SUMS\n```\n\n`minisign.pub`:\n\n```\n' >> release-notes.md
           cat release/minisign.pub >> release-notes.md
           printf '```\n' >> release-notes.md

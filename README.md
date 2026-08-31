@@ -98,13 +98,13 @@ Requirements: macOS 13.5 or newer (Apple Silicon or Intel) and
 ```bash
 brew tap corral-sh/tap
 brew trust corral-sh/tap      # Homebrew ≥ 6 requires third-party taps to be trusted explicitly
-brew install corral
+brew install corral-sh/tap/corral
 ```
 
 This pulls Lima as a dependency and builds `corral` from the tagged source —
-there is no opaque binary download. Upgrade with `brew upgrade corral`.
-Use the fully qualified name `corral-sh/tap/corral` if you need it —
-homebrew-core's `corral` is an unrelated Pony-language tool.
+there is no opaque binary download. Upgrade with `brew upgrade corral-sh/tap/corral`.
+The fully qualified name matters: homebrew-core's `corral` is an unrelated
+Pony-language tool, and Homebrew resolves the bare name to core.
 
 **From a checkout** (if you want to read or hack on it first):
 

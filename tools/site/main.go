@@ -1,4 +1,4 @@
-// Command site renders the internal product site (GitLab Pages) from files
+// Command site renders the project site (GitHub Pages) from files
 // that already exist in the repository: README.md, docs/*.md and
 // changelog/*.md. Nothing is authored twice — the site is a view of them.
 //
@@ -99,7 +99,7 @@ func main() {
 	write("feasibility.html", "Feasibility", "", render(read("docs/FEASIBILITY.md")), nil)
 	write("contributing.html", "Contributing", "", render(read("CONTRIBUTING.md")), nil)
 	var idx strings.Builder
-	idx.WriteString("<h1>Releases</h1><p>One page per release — the same notes the GitLab release carries.</p><ul class=\"releases\">")
+	idx.WriteString("<h1>Releases</h1><p>One page per release — the same notes the GitHub release carries.</p><ul class=\"releases\">")
 	for _, r := range rels {
 		fmt.Fprintf(&idx, `<li><a href="%s">%s</a> <span class="date">%s</span></li>`, filepath.Base(r.File), r.Version, r.Date)
 	}
@@ -200,7 +200,7 @@ var tpl = template.Must(template.New("page").Parse(`<!doctype html>
 {{range .Nav}}<a href="{{$.Depth}}{{.File}}"{{if eq .File $.Active}} class="on"{{end}}>{{.Title}}</a>{{end}}</nav></header>
 {{if .Hero}}<section class="hero"><h1>{{.Tagline}}</h1>
 <p>Corral runs AI coding agents inside a per-project Linux VM on your Mac — full speed inside, nothing of yours outside.</p>
-<p class="install"><code>brew tap corral-sh/tap && brew trust corral-sh/tap && brew install corral</code></p>
+<p class="install"><code>brew tap corral-sh/tap && brew trust corral-sh/tap && brew install corral-sh/tap/corral</code></p>
 {{with .Latest}}<p class="latest">Latest release: <a href="releases/{{.Version}}.html">{{.Version}}</a> · {{.Date}}</p>{{end}}</section>{{end}}
 <main>{{.Body}}</main>
 <footer><a href="https://github.com/corral-sh/corral">Corral on GitHub</a> · Apache-2.0. Rendered from the repository's README, docs and changelog{{if .Version}} · corral {{.Version}}{{end}}.</footer>

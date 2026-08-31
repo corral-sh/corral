@@ -129,60 +129,6 @@ func TestLogPaneIgnoresStaleMessage(t *testing.T) {
 	}
 }
 
-// Progress lines reported by a running operation must reach the busy view:
-// runOp wires the report callback to opLogMsg via a channel and a re-armed
-// listener. (A no-op report callback here once left busyLog permanently empty.)
-func TestOpProgressReachesBusyLog(t *testing.T) {
-	lines := []string{"booting the VM", "waiting for SSH", "ready"}
-	m := &dashModel{ctx: context.Background(), src: DashboardSource{
-		Toggle: func(_ context.Context, _ BoxRow, report func(string)) error {
-			for _, l := range lines {
-				report(l)
-			}
-			return nil
-		},
-	}}
-	_, cmd := m.runOp("toggle", BoxRow{Name: "b", Status: "Running"})
-	batch, ok := cmd().(tea.BatchMsg)
-	if !ok || len(batch) != 2 {
-		t.Fatalf("runOp must return a batch of operation + listener, got %T", cmd())
-	}
-	// The operation runs first: it fills the buffered channel and closes it.
-	done, ok := batch[0]().(opDoneMsg)
-	if !ok || done.err != nil {
-		t.Fatalf("operation: %+v", done)
-	}
-	// Pump the listener through Update the way the program loop would.
-	listen := batch[1]
-	for i := 0; ; i++ {
-		msg := listen()
-		if msg == nil {
-			break // channel closed — listener retires
-		}
-		lm, ok := msg.(opLogMsg)
-		if !ok {
-			t.Fatalf("listener produced %T", msg)
-		}
-		if string(lm) != lines[i] {
-			t.Fatalf("line %d = %q, want %q", i, lm, lines[i])
-		}
-		mod, next := m.Update(lm)
-		m = mod.(*dashModel)
-		if next == nil {
-			t.Fatal("opLogMsg must re-arm the listener")
-		}
-		listen = next
-	}
-	if len(m.busyLog) != len(lines) || m.busyLog[len(lines)-1] != "ready" {
-		t.Fatalf("busyLog = %q, want the reported lines", m.busyLog)
-	}
-	mod, _ := m.Update(done)
-	m = mod.(*dashModel)
-	if m.busyLog != nil || m.opCh != nil {
-		t.Fatal("opDoneMsg must clear the busy state")
-	}
-}
-
 // While an operation runs, state-changing keys stay blocked but `l` must open
 // the log pane in follow mode — the box's log is being written at exactly that
 // moment, so the pane is the natural way to trail a start/stop.
@@ -192,10 +138,14 @@ func TestLogPaneOpensDuringOperation(t *testing.T) {
 	}
 	row := BoxRow{Name: "b", Status: "Stopped", Project: "/p"}
 	m := &dashModel{src: src, ctx: context.Background(), width: 120, height: 30,
-		rows: []BoxRow{row}, busy: "starting b"}
+		rows: []BoxRow{row}, busy: "starting b", busyStart: time.Now().Add(-12 * time.Second)}
 
-	if !strings.Contains(m.View(), "l full log") {
+	view := m.View()
+	if !strings.Contains(view, "l full log") {
 		t.Error("busy view must hint that the log pane is available")
+	}
+	if !strings.Contains(view, "12s") {
+		t.Errorf("busy view must show the elapsed time:\n%s", view)
 	}
 	mod, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
 	m = mod.(*dashModel)

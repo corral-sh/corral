@@ -83,22 +83,21 @@ func RunDashboard(ctx context.Context, src DashboardSource) (DashboardAction, er
 }
 
 type dashModel struct {
-	src      DashboardSource
-	ctx      context.Context
-	rows     []BoxRow
-	cursor   int
-	loading  bool
-	busy     string // message while an operation runs
-	busyLog  []string
-	opCh     chan string // progress lines of the running operation; nil when idle
-	confirm  string      // pending confirmation kind
-	status   string
-	err      error
-	action   DashboardAction
-	width    int
-	height   int
-	lastTick time.Time
-	logs     *logPane // non-nil while the log pane is open
+	src       DashboardSource
+	ctx       context.Context
+	rows      []BoxRow
+	cursor    int
+	loading   bool
+	busy      string    // message while an operation runs
+	busyStart time.Time // when it started, for the elapsed indicator
+	confirm   string    // pending confirmation kind
+	status    string
+	err       error
+	action    DashboardAction
+	width     int
+	height    int
+	lastTick  time.Time
+	logs      *logPane // non-nil while the log pane is open
 }
 
 // logPane is the in-dashboard log viewer opened with `l`. It replaces the
@@ -136,7 +135,7 @@ type opDoneMsg struct {
 	err error
 	msg string
 }
-type opLogMsg string
+type busyTick time.Time
 type refreshTick time.Time
 
 func (m *dashModel) Init() tea.Cmd {
@@ -244,19 +243,13 @@ func (m *dashModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(m.fetchRows(), refreshEvery())
 		}
 		return m, refreshEvery()
-	case opLogMsg:
-		m.busyLog = append(m.busyLog, string(msg))
-		if len(m.busyLog) > 4 {
-			m.busyLog = m.busyLog[1:]
+	case busyTick:
+		if m.busy == "" {
+			return m, nil // operation finished — let the ticker retire
 		}
-		if m.opCh == nil {
-			return m, nil
-		}
-		return m, listenOp(m.opCh) // re-arm for the next line
+		return m, busyTickEvery() // re-render the elapsed time each second
 	case opDoneMsg:
 		m.busy = ""
-		m.busyLog = nil
-		m.opCh = nil
 		if msg.err != nil {
 			m.status = Bad.Render(msg.err.Error())
 		} else {
@@ -445,45 +438,31 @@ func (m *dashModel) runOp(kind string, row BoxRow) (tea.Model, tea.Cmd) {
 	case "delete":
 		m.busy = "deleting " + row.Name
 	}
-	// The operation's report callback feeds a channel; listenOp turns each
-	// line into an opLogMsg so the last few show under the busy spinner.
-	ch := make(chan string, 32)
-	m.opCh = ch
-	report := func(line string) {
-		select {
-		case ch <- line:
-		default: // never block limactl's stream on a slow UI; drop the line instead
-		}
-	}
+	// The dashboard shows only the elapsed indicator while the operation runs;
+	// the full stream is one `l` away in the log pane (follow mode).
+	m.busyStart = time.Now()
 	busy := m.busy
 	op := func() tea.Msg {
 		var err error
 		switch kind {
 		case "toggle":
-			err = m.src.Toggle(m.ctx, row, report)
+			err = m.src.Toggle(m.ctx, row, func(string) {})
 		case "delete":
-			err = m.src.Delete(m.ctx, row, report)
+			err = m.src.Delete(m.ctx, row, func(string) {})
 		}
-		close(ch)
 		verb := strings.TrimSuffix(strings.Fields(busy)[0], "ing") + "ed"
 		if verb == "stoped" {
 			verb = "stopped"
 		}
 		return opDoneMsg{err: err, msg: row.Name + " " + verb}
 	}
-	return m, tea.Batch(op, listenOp(ch))
+	return m, tea.Batch(op, busyTickEvery())
 }
 
-// listenOp delivers the next progress line of the running operation; the
-// opLogMsg case re-arms it until the operation closes the channel.
-func listenOp(ch chan string) tea.Cmd {
-	return func() tea.Msg {
-		line, ok := <-ch
-		if !ok {
-			return nil
-		}
-		return opLogMsg(line)
-	}
+// busyTickEvery re-renders the busy view once a second so the elapsed time
+// moves; the busyTick case retires it when the operation is done.
+func busyTickEvery() tea.Cmd {
+	return tea.Tick(time.Second, func(t time.Time) tea.Msg { return busyTick(t) })
 }
 
 func (m *dashModel) View() string {
@@ -519,13 +498,15 @@ func (m *dashModel) View() string {
 	sb.WriteString("\n")
 	switch {
 	case m.busy != "":
-		sb.WriteString("  " + Warn.Render("⏳ "+m.busy+"…") + "\n")
-		for _, l := range m.busyLog {
-			sb.WriteString("    " + Subtle.Render(l) + "\n")
+		line := "⏳ " + m.busy + "…"
+		if !m.busyStart.IsZero() {
+			line += " " + time.Since(m.busyStart).Round(time.Second).String()
 		}
+		sb.WriteString("  " + Warn.Render(line))
 		if m.src.Logs != nil {
-			sb.WriteString("    " + Subtle.Render("l full log") + "\n")
+			sb.WriteString(Subtle.Render("   ·   l full log"))
 		}
+		sb.WriteString("\n")
 	case m.confirm == "delete":
 		row, _ := m.selected()
 		sb.WriteString("  " + Bad.Render(fmt.Sprintf("Delete box %s? The VM disk is removed; your project and agent login are kept. [y/N]", row.Name)) + "\n")

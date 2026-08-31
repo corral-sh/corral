@@ -90,7 +90,8 @@ type dashModel struct {
 	loading  bool
 	busy     string // message while an operation runs
 	busyLog  []string
-	confirm  string // pending confirmation kind
+	opCh     chan string // progress lines of the running operation; nil when idle
+	confirm  string      // pending confirmation kind
 	status   string
 	err      error
 	action   DashboardAction
@@ -248,10 +249,14 @@ func (m *dashModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if len(m.busyLog) > 4 {
 			m.busyLog = m.busyLog[1:]
 		}
-		return m, nil
+		if m.opCh == nil {
+			return m, nil
+		}
+		return m, listenOp(m.opCh) // re-arm for the next line
 	case opDoneMsg:
 		m.busy = ""
 		m.busyLog = nil
+		m.opCh = nil
 		if msg.err != nil {
 			m.status = Bad.Render(msg.err.Error())
 		} else {
@@ -430,19 +435,44 @@ func (m *dashModel) runOp(kind string, row BoxRow) (tea.Model, tea.Cmd) {
 	case "delete":
 		m.busy = "deleting " + row.Name
 	}
-	return m, func() tea.Msg {
+	// The operation's report callback feeds a channel; listenOp turns each
+	// line into an opLogMsg so the last few show under the busy spinner.
+	ch := make(chan string, 32)
+	m.opCh = ch
+	report := func(line string) {
+		select {
+		case ch <- line:
+		default: // never block limactl's stream on a slow UI; drop the line instead
+		}
+	}
+	busy := m.busy
+	op := func() tea.Msg {
 		var err error
 		switch kind {
 		case "toggle":
-			err = m.src.Toggle(m.ctx, row, func(string) {})
+			err = m.src.Toggle(m.ctx, row, report)
 		case "delete":
-			err = m.src.Delete(m.ctx, row, func(string) {})
+			err = m.src.Delete(m.ctx, row, report)
 		}
-		verb := strings.TrimSuffix(strings.Fields(m.busy)[0], "ing") + "ed"
+		close(ch)
+		verb := strings.TrimSuffix(strings.Fields(busy)[0], "ing") + "ed"
 		if verb == "stoped" {
 			verb = "stopped"
 		}
 		return opDoneMsg{err: err, msg: row.Name + " " + verb}
+	}
+	return m, tea.Batch(op, listenOp(ch))
+}
+
+// listenOp delivers the next progress line of the running operation; the
+// opLogMsg case re-arms it until the operation closes the channel.
+func listenOp(ch chan string) tea.Cmd {
+	return func() tea.Msg {
+		line, ok := <-ch
+		if !ok {
+			return nil
+		}
+		return opLogMsg(line)
 	}
 }
 

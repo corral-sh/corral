@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/corral-sh/corral/security/advisories/new
+    about: Private vulnerability reporting — never a public issue. See docs/SECURITY.md.
+  - name: Read the security model first
+    url: https://github.com/corral-sh/corral/blob/main/docs/SECURITY.md
+    about: The threat model, what a repository can and cannot do, and known gaps.

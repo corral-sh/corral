@@ -1,0 +1,15 @@
+# Weekly dependency PRs. Dependency bumps are exempt from the issue-first rule
+# and from changelog entries unless they change user-visible behaviour.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      go-deps:
+        patterns: ["*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

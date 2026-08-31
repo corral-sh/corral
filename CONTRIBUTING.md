@@ -53,9 +53,27 @@ short version:
   `changelog/unreleased.md`.
 - Error messages tell the user the next command to run.
 
+## Workflow: every change starts as an issue
+
+Every change — feature, fix, docs — references a work item, so the history
+explains itself:
+
+1. **Open an issue first** (or pick an existing one). New issues land as
+   `status: triage`; the maintainer moves them to `status: accepted` (free to
+   pick up — comment that you're taking it and it becomes
+   `status: in progress`), `status: deferred`, or closes them with a reason.
+   `status: blocked` marks work waiting on something external.
+2. Branch, make the change, and reference the issue with **`Fixes #N`** in the
+   PR (or the commit) so GitHub closes it on merge.
+3. Issues good for a first contribution carry `good first issue`; ones where
+   help is explicitly wanted carry `help wanted`. Releases are tracked with
+   milestones (e.g. `0.7.1`).
+
+Exempt from issue-first: dependency bumps from Dependabot and pure typo fixes.
+
 ## Reporting bugs and proposing features
 
-Use the issue templates. For anything security-sensitive, do **not** open a
+Use the issue forms. For anything security-sensitive, do **not** open a
 public issue — use GitHub's private vulnerability reporting
 (Security → Report a vulnerability); see [docs/SECURITY.md](docs/SECURITY.md).
 

@@ -44,7 +44,7 @@ experiments — tests already do (`t.Setenv`).
 - Box names must fit Lima's UNIX socket path (`paths.MaxBoxNameLen`). Do not lengthen the default `~/.corral` layout.
 - Guest scripts must not use `curl | bash` except the agent vendor's own installer; download + checksum-verify instead (see `toolchain-node.sh`).
 - Keep `changelog/unreleased.md` (Keep a Changelog format) current; one file per release under `changelog/`, `CHANGELOG.md` is only the index. The release workflow publishes `changelog/<version>.md` as the GitHub release notes, so never write "see CHANGELOG.md" — each release is self-contained. Releases are annotated git tags `vX.Y.Z` pushed to `main`.
-- Work items: reference the GitHub issue with `Fixes #N` in the commit or PR so GitHub closes it on merge.
+- Work items: **every change starts as a GitHub issue** (open one if none exists) and the commit or PR carries `Fixes #N` so GitHub closes it on merge. Status flows through labels: `status: triage` → `accepted` → `in progress` (or `deferred`/`blocked`); releases group under milestones. Exempt: Dependabot bumps and pure typo fixes.
 - Error messages tell the user the next command to run (`corral logs <box>`, `corral rebuild`).
 
 ## Release checklist

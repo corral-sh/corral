@@ -4,6 +4,8 @@
 
 ### Added
 
+- Contributor workflow: issue forms with status labels, a pull request template, a Code of Conduct, Dependabot, and an issue-first process documented in CONTRIBUTING.md.
+
 ### Changed
 
 ### Fixed

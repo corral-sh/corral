@@ -1,0 +1,26 @@
+name: Feature request
+description: A capability Corral should have, or a control it should offer
+labels: ["enhancement", "status: triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do that Corral doesn't let you do (or makes hard)? Concrete workflows beat abstract wishes.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behaviour
+      description: |
+        What would it look like — a new command, config key, mode? If it touches what a
+        repository's own `.corral.toml` may set, say which trust class you expect
+        (a repo file can shape the guest, never widen host access).
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Workarounds you tried; other tools that do this.

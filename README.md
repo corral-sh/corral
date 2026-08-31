@@ -663,8 +663,9 @@ releases are annotated `vX.Y.Z` tags on `main`.
 ## CI gates and releases
 
 Every push and pull request runs the `verify` jobs in parallel on GitHub
-Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)); every one of
-them must be green before anything is built or released:
+Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)). `main` only
+moves by pull request with every check green (enforced by a ruleset), so a
+work item is never closed by a broken build:
 
 | Job | Gate |
 |---|---|

@@ -45,6 +45,7 @@ experiments — tests already do (`t.Setenv`).
 - Guest scripts must not use `curl | bash` except the agent vendor's own installer; download + checksum-verify instead (see `toolchain-node.sh`).
 - Keep `changelog/unreleased.md` (Keep a Changelog format) current; one file per release under `changelog/`, `CHANGELOG.md` is only the index. The release workflow publishes `changelog/<version>.md` as the GitHub release notes, so never write "see CHANGELOG.md" — each release is self-contained. Releases are annotated git tags `vX.Y.Z` pushed to `main`.
 - Work items: **every change starts as a GitHub issue** (open one if none exists) and the commit or PR carries `Fixes #N` so GitHub closes it on merge. Status flows through labels: `status: triage` → `accepted` → `in progress` (or `deferred`/`blocked`); releases group under milestones. Exempt: Dependabot bumps and pure typo fixes.
+- **`main` only moves by pull request with every CI check green** (protect-main ruleset: PR required + the six ci.yml checks). Direct pushes are refused, so a `Fixes #N` issue can never be closed by a broken build. Flow: branch → PR → `gh pr merge --auto --squash`.
 - Error messages tell the user the next command to run (`corral logs <box>`, `corral rebuild`).
 
 ## Release checklist
@@ -53,7 +54,8 @@ experiments — tests already do (`t.Setenv`).
 2. Bump `tag` in `Formula/corral.rb` **and** push the identical file to the tap repo
    `https://github.com/corral-sh/homebrew-tap` (Formula/corral.rb).
 3. `make security test build && bin/corral version`, then `make e2e` (real boxes on this Mac, ~4 min; `scripts/e2e.sh`).
-4. `git tag -a vX.Y.Z -m "..." && git push origin main --tags`.
+4. Merge the release PR (main cannot be pushed directly), then tag the merge commit:
+   `git pull && git tag -a vX.Y.Z -m "..." && git push origin vX.Y.Z`.
 5. CI does the rest on the tag (`.github/workflows/release.yml`): verify → build + sign → GitHub release
    with `changelog/X.Y.Z.md` as the notes and the binaries, `SHA256SUMS` and `SHA256SUMS.minisig` attached.
    Manual fallback: `make dist`, sign with `go run ./tools/sign -sign dist/SHA256SUMS`, then

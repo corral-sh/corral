@@ -63,7 +63,9 @@ explains itself:
    pick up — comment that you're taking it and it becomes
    `status: in progress`), `status: deferred`, or closes them with a reason.
    `status: blocked` marks work waiting on something external.
-2. Branch, make the change, and reference the issue with **`Fixes #N`** in the
+2. Branch and open a **pull request** — `main` only moves by PR with every CI
+   check green (a ruleset enforces it), so a closed issue always corresponds
+   to a green build. Reference the issue with **`Fixes #N`** in the
    PR (or the commit) so GitHub closes it on merge.
 3. Issues good for a first contribution carry `good first issue`; ones where
    help is explicitly wanted carry `help wanted`. Releases are tracked with

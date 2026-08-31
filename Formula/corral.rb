@@ -1,9 +1,9 @@
 # Homebrew formula for Corral.
 #
 # Canonical copy lives in the tap: https://github.com/corral-sh/homebrew-tap
-#     brew tap corral-sh/tap https://github.com/corral-sh/homebrew-tap
-#     brew trust corral-sh/tap   # Homebrew >= 6
 #     brew install corral-sh/tap/corral
+# (auto-taps and auto-trusts; the explicit route is brew tap corral-sh/tap +
+#  brew trust corral-sh/tap first)
 # Keep this file and the tap's Formula/corral.rb identical; bump `tag` on
 # every release (the release checklist in CLAUDE.md covers it).
 class Corral < Formula

@@ -93,18 +93,26 @@ flowchart LR
 Requirements: macOS 13.5 or newer (Apple Silicon or Intel) and
 [Homebrew](https://brew.sh).
 
-**Homebrew (recommended):**
+**Homebrew (recommended)** — one command:
 
 ```bash
-brew tap corral-sh/tap
-brew trust corral-sh/tap      # Homebrew ≥ 6 requires third-party taps to be trusted explicitly
 brew install corral-sh/tap/corral
 ```
 
-This pulls Lima as a dependency and builds `corral` from the tagged source —
-there is no opaque binary download. Upgrade with `brew upgrade corral-sh/tap/corral`.
+Homebrew taps `corral-sh/tap` and trusts the formula automatically, pulls Lima
+as a dependency, and builds `corral` from the tagged source — there is no
+opaque binary download. Upgrade with `brew upgrade corral-sh/tap/corral`.
 The fully qualified name matters: homebrew-core's `corral` is an unrelated
 Pony-language tool, and Homebrew resolves the bare name to core.
+
+If Homebrew refuses to load the formula (≥ 6 requires third-party taps to be
+trusted), take the explicit route:
+
+```bash
+brew tap corral-sh/tap
+brew trust corral-sh/tap
+brew install corral-sh/tap/corral
+```
 
 **From a checkout** (if you want to read or hack on it first):
 

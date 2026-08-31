@@ -200,7 +200,7 @@ var tpl = template.Must(template.New("page").Parse(`<!doctype html>
 {{range .Nav}}<a href="{{$.Depth}}{{.File}}"{{if eq .File $.Active}} class="on"{{end}}>{{.Title}}</a>{{end}}</nav></header>
 {{if .Hero}}<section class="hero"><h1>{{.Tagline}}</h1>
 <p>Corral runs AI coding agents inside a per-project Linux VM on your Mac — full speed inside, nothing of yours outside.</p>
-<p class="install"><code>brew tap corral-sh/tap && brew trust corral-sh/tap && brew install corral-sh/tap/corral</code></p>
+<p class="install"><code>brew install corral-sh/tap/corral</code></p>
 {{with .Latest}}<p class="latest">Latest release: <a href="releases/{{.Version}}.html">{{.Version}}</a> · {{.Date}}</p>{{end}}</section>{{end}}
 <main>{{.Body}}</main>
 <footer><a href="https://github.com/corral-sh/corral">Corral on GitHub</a> · Apache-2.0. Rendered from the repository's README, docs and changelog{{if .Version}} · corral {{.Version}}{{end}}.</footer>

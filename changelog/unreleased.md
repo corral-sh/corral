@@ -14,6 +14,8 @@
 
 - Box metadata is now written atomically (temp file + rename) (#18). Several processes read and write it at once — the launcher, the broker child it has just spawned, a second session, the idle sweep — and the old truncate-then-write left a window in which a reader saw an empty file. The visible symptom was a first `corral up`/`run` on a `network = "broker"` box occasionally failing with `egress broker … did not come up` (the child had logged `unknown box`) while the box itself was fine; the next command worked.
 
+- **`corral upgrade` now runs `brew update` first** (#19). Homebrew auto-updates at most once a day, so a user whose Homebrew had refreshed in the last 24 h was told *"corral X already installed"* while the tap already carried a newer formula. `corral upgrade` is meant to be the one command, and now it is.
+
 - Dashboard: while a start/stop/delete runs, the busy line now shows the elapsed time and `l` opens the log pane in follow mode so the whole operation can be trailed; previously every key was blocked and nothing moved until the state change landed.
 - The test suite no longer writes a stray box metadata stub (`boxes/x.json`) into the developer's real `~/.corral` — `TestSessionBeforeMetadataIsAdopted` now runs under a temp `CORRAL_HOME`.
 

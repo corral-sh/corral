@@ -835,7 +835,11 @@ func newUpgradeCmd() *cobra.Command {
 			var err error
 			switch {
 			case strings.Contains(self, "/Cellar/"):
-				err = runVisible(ctx, "brew", "upgrade", "corral-sh/tap/corral", "lima")
+				for _, step := range brewUpgradeSteps {
+					if err = runVisible(ctx, step[0], step[1:]...); err != nil {
+						break
+					}
+				}
 			default:
 				src := installSource()
 				if src == "" {
@@ -910,6 +914,16 @@ func installSource() string {
 		return ""
 	}
 	return v.Source
+}
+
+// brewUpgradeSteps is what `upgrade` runs for a Homebrew install, in order,
+// stopping at the first failure. Homebrew auto-updates at most once a day
+// (HOMEBREW_AUTO_UPDATE_SECS), so without the explicit `brew update` a formula
+// pushed to the tap since then is invisible and the upgrade reports
+// "already installed".
+var brewUpgradeSteps = [][]string{
+	{"brew", "update"},
+	{"brew", "upgrade", "corral-sh/tap/corral", "lima"},
 }
 
 func runVisible(ctx context.Context, name string, args ...string) error {

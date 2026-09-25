@@ -216,6 +216,13 @@ func Milestone(line string) (string, bool) {
 		return "ready", true
 	case strings.Contains(l, "stopping") || strings.Contains(l, "shutting down"):
 		return "shutting down", true
+	case strings.Contains(l, "use of closed network connection"):
+		// Go's net.ErrClosed: the host agent's accept loop reporting a
+		// listener it closed on purpose while shutting down. Logged at
+		// level=error on every clean stop; showing it as an error during a
+		// healthy shutdown teaches users to ignore the real ones. A stop that
+		// actually fails still returns its own error.
+		return "", false
 	case strings.Contains(l, "level=fatal") || strings.Contains(l, "level=error") || strings.Contains(l, "error"):
 		return "error: " + Truncate(line, 70), true
 	}

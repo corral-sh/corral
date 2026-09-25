@@ -12,6 +12,7 @@ func TestMilestone(t *testing.T) {
 		`  cloning golden-0289f0304c9c (copy-on-write)`:                                 "cloning the golden image",
 		`INFO[0040] READY. Run ` + "`limactl shell x`" + ` to open the shell.`:          "ready",
 		`time="…" level=fatal msg=unimplemented`:                                        "error: time=\"…\" level=fatal msg=unimplemented",
+		`Error: [hostagent] failed to start the SSH port forwarder`:                     "error: Error: [hostagent] failed to start the SSH port forwarder",
 	}
 	for in, want := range cases {
 		got, ok := Milestone(in)
@@ -19,7 +20,13 @@ func TestMilestone(t *testing.T) {
 			t.Errorf("Milestone(%q) = %q,%v want %q", in, got, ok, want)
 		}
 	}
-	for _, noise := range []string{"{\"level\":\"debug\",\"msg\":\"Time sync: drift -98ms within threshold\"}", "  12.3 MiB / 600 MiB [====>    ] 2%", ""} {
+	for _, noise := range []string{
+		"{\"level\":\"debug\",\"msg\":\"Time sync: drift -98ms within threshold\"}", "  12.3 MiB / 600 MiB [====>    ] 2%", "",
+		// The host agent closing its own listener on a clean stop (net.ErrClosed), as
+		// limactl prints it and as it appears in ha.stderr.log.
+		"Error: [hostagent] accept tcp 127.0.0.1:62805: use of closed network connection",
+		`{"level":"error","msg":"accept tcp 127.0.0.1:62805: use of closed network connection","time":"2026-09-25T18:16:45+08:00"}`,
+	} {
 		if _, ok := Milestone(noise); ok {
 			t.Errorf("noise %q treated as a milestone", noise)
 		}

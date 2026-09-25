@@ -1,7 +1,7 @@
 # Corral — notes for Claude Code
 
 Corral (`corral`) runs AI coding agents inside per-project Lima VMs on
-macOS. Go 1.25, Cobra CLI, Bubble Tea/lipgloss/huh TUI. Module path
+macOS. Go 1.26, Cobra CLI, Bubble Tea/lipgloss/huh TUI. Module path
 `github.com/corral-sh/corral`.
 
 ## Commands

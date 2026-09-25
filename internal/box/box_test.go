@@ -15,6 +15,7 @@ import (
 	"github.com/corral-sh/corral/internal/broker"
 	"github.com/corral-sh/corral/internal/config"
 	"github.com/corral-sh/corral/internal/guest"
+	"github.com/corral-sh/corral/internal/paths"
 	"github.com/corral-sh/corral/internal/policy"
 )
 
@@ -1005,5 +1006,42 @@ func TestRenderDropsPrivilegesBeforeProjectScripts(t *testing.T) {
 	}
 	if s := guest.Script("drop-privileges"); !strings.Contains(s, "docker") || !strings.Contains(s, "exit 1") {
 		t.Error("drop-privileges must cover the docker group and fail closed")
+	}
+}
+
+// SaveMeta replaces the file atomically: a reader racing a writer sees the old
+// or the new metadata, never an empty or half-written file, and no temp file
+// is left behind.
+func TestSaveMetaIsAtomic(t *testing.T) {
+	t.Setenv("CORRAL_HOME", filepath.Join(t.TempDir(), "eb"))
+	if err := SaveMeta(&Meta{Name: "atom", Project: "/p"}); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := range 300 {
+			if err := SaveMeta(&Meta{Name: "atom", Project: fmt.Sprintf("/p/%d", i)}); err != nil {
+				t.Error(err)
+				return
+			}
+		}
+	}()
+	for reading := true; reading; {
+		select {
+		case <-done:
+			reading = false
+		default:
+		}
+		if m, err := LoadMeta("atom"); err != nil || m.Project == "" {
+			t.Fatalf("reader saw a partial file: %v", err)
+		}
+	}
+	dir, _ := paths.BoxesDir()
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		if e.Name() != "atom.json" {
+			t.Errorf("stray file left behind: %s", e.Name())
+		}
 	}
 }

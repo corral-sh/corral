@@ -8,6 +8,8 @@
 
 ### Fixed
 
+- `corral stop` and the shutdown step of `rebuild` no longer flash `error: … [hostagent] accept tcp … use of closed network connection` (#35). Lima's host agent logs that at `level=error` when it closes its own listener on every clean stop; the progress line now treats it as noise. Every other Lima error still shows, and a stop that fails still reports its own error.
+
 - **Destructive commands no longer exit 0 having done nothing when there is no terminal** (#33). `golden prune`, `rebuild`, `delete`, `delete --all` and `uninstall` treated an unanswerable confirmation (a script, CI, an agent's shell) as "no" and returned success silently — `golden prune` even listed what it would delete first. They now fail with `` nothing done: … re-run with `<command> --yes` ``. A "no" typed at the prompt is still a quiet exit.
 
 - `TestSaveMetaIsAtomic` no longer writes a phantom `atom` box into the developer's real `~/.corral` when it fails: its writer goroutine is stopped and awaited before the test returns and `CORRAL_HOME` is restored (#29).

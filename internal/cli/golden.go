@@ -200,8 +200,12 @@ func newGoldenPruneCmd() *cobra.Command {
 				ui.Step(os.Stdout, "would free %s (%d golden image(s)); run without --dry-run to delete", ui.HumanBytes(total), len(victims))
 				return nil
 			}
-			if !yes && !ui.Confirm(os.Stderr, fmt.Sprintf("Delete %d golden image(s), %s? Boxes cloned from them keep working; the next new box rebuilds a golden.", len(victims), ui.HumanBytes(total)), false) {
-				return nil
+			rerun := "corral golden prune"
+			if all {
+				rerun += " --all"
+			}
+			if ok, err := confirmDestructive(yes, fmt.Sprintf("Delete %d golden image(s), %s? Boxes cloned from them keep working; the next new box rebuilds a golden.", len(victims), ui.HumanBytes(total)), rerun); !ok {
+				return err
 			}
 			return pruneGoldens(ctx, victims, bytes)
 		},

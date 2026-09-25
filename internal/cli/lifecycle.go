@@ -123,8 +123,8 @@ hoc inside the old box is lost.`,
 			if err != nil {
 				return err
 			}
-			if !yes && !ui.Confirm(os.Stderr, fmt.Sprintf("Rebuild %s? Everything installed inside the box since creation is lost.", b.Name), false) {
-				return nil
+			if ok, err := confirmDestructive(yes, fmt.Sprintf("Rebuild %s? Everything installed inside the box since creation is lost.", b.Name), "corral rebuild "+b.Name); !ok {
+				return err
 			}
 			if err := ui.RunWithProgress(ctx, "Deleting "+b.Name, func(r func(string)) error { return b.Delete(ctx, r) }); err != nil {
 				return err
@@ -156,8 +156,8 @@ func newDeleteCmd() *cobra.Command {
 					ui.Step(os.Stdout, "no boxes")
 					return nil
 				}
-				if !yes && !ui.Confirm(os.Stderr, fmt.Sprintf("Delete all %d boxes?", len(metas)), false) {
-					return nil
+				if ok, err := confirmDestructive(yes, fmt.Sprintf("Delete all %d boxes?", len(metas)), "corral delete --all"); !ok {
+					return err
 				}
 				for _, m := range metas {
 					b, err := openBoxByName(m.Name)
@@ -177,8 +177,8 @@ func newDeleteCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if !yes && !ui.Confirm(os.Stderr, fmt.Sprintf("Delete box %s? The VM disk is removed; %s and your agent login are kept.", b.Name, ui.ShortenHome(b.Project)), false) {
-				return nil
+			if ok, err := confirmDestructive(yes, fmt.Sprintf("Delete box %s? The VM disk is removed; %s and your agent login are kept.", b.Name, ui.ShortenHome(b.Project)), "corral delete "+b.Name); !ok {
+				return err
 			}
 			if err := ui.RunWithProgress(ctx, "Deleting "+b.Name, func(r func(string)) error { return b.Delete(ctx, r) }); err != nil {
 				return err

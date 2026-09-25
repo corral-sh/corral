@@ -874,8 +874,8 @@ func newUninstallCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if !yes && !ui.Confirm(os.Stderr, fmt.Sprintf("Delete all boxes and %s (including stored agent logins)?", ui.ShortenHome(h)), false) {
-				return nil
+			if ok, err := confirmDestructive(yes, fmt.Sprintf("Delete all boxes and %s (including stored agent logins)?", ui.ShortenHome(h)), "corral uninstall"); !ok {
+				return err
 			}
 			metas, _ := box.AllMeta()
 			for _, m := range metas {

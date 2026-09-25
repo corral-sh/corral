@@ -51,6 +51,10 @@ func Banner(w io.Writer, version string) {
 // IsTTY reports whether stdout is a terminal.
 func IsTTY() bool { return term.IsTerminal(int(os.Stdout.Fd())) }
 
+// CanPrompt reports whether a question can be asked and answered: the prompt
+// shows on a terminal and the answer is read from one.
+func CanPrompt() bool { return IsTTY() && term.IsTerminal(int(os.Stdin.Fd())) }
+
 // Width returns the terminal width or a sane default.
 func Width() int {
 	if w, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && w > 20 {

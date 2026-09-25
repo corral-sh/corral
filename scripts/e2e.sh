@@ -68,6 +68,7 @@ check "the docker daemon refuses the box user"         '! guest "$A" "docker inf
 check "docker socket is root-only (no stale gid reaches it)" 'guest "$A" "stat -c %U:%G /run/docker.sock" | grep -qx root:root'
 check "the repo provision script ran without sudo or docker" '[ "$(guest "$A" "cat ~/.corral/e2e-provision-privileges")" = done ]'
 check "preflight reports the privileges control as passing" '"$BIN" -C "$A" run --preflight -- true 2>&1 | grep -E "control privileges" | tee /dev/stderr | grep -q "✓"'
+check "apt-daily timers are masked"                     'guest "$A" "systemctl is-enabled apt-daily.timer apt-daily-upgrade.timer; true" | grep -cx masked | grep -qx 2'
 check "denial recorded: corral egress lists example.com" '"$BIN" -C "$A" egress | grep -q example.com:443'
 check "stop box A"                                      '"$BIN" -C "$A" stop'
 # Scoped to this run's box: another box of the developer's may legitimately have a broker running.

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -498,6 +499,9 @@ func createBox(ctx context.Context, b *box.Box) error {
 					ui.Warning(os.Stderr, "memory = %s with the %s toolchain: Gradle plus the agent may OOM; consider memory = \"8GiB\"", b.Cfg.Memory, tc)
 				}
 			}
+		}
+		if b.Cfg.Network != config.NetworkFull && slices.Contains(b.Cfg.Toolchains, "docker") {
+			ui.Warning(os.Stderr, "network = %s with the docker toolchain: the docker group is root-equivalent, so the box user is not in it — docker is installed but the daemon is root-only", b.Cfg.Network)
 		}
 		if !b.Cfg.Rosetta {
 			for _, tc := range b.Cfg.Toolchains {

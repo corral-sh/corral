@@ -81,12 +81,9 @@ done
 nft delete table inet corral_broker 2>/dev/null || true
 nft -f /etc/corral/broker.nft
 
-# Remove the blanket sudo grant; keep the scoped corral-* restart entries.
-rm -f /etc/sudoers.d/90-cloud-init-users
-for u in $(getent group sudo | cut -d: -f4 | tr ',' ' ') $(getent group admin | cut -d: -f4 | tr ',' ' '); do
-  gpasswd -d "$u" sudo >/dev/null 2>&1 || true
-  gpasswd -d "$u" admin >/dev/null 2>&1 || true
-done
+# Remove the blanket sudo grant and the root-equivalent groups (docker);
+# keep the scoped corral-* restart entries. Installed by drop-privileges.sh.
+/opt/corral/bin/corral-drop-privileges
 
 echo "corral-broker-lockdown: egress only via 192.168.5.2:${PORT}; sudo grant removed"
 LOCK_EOF

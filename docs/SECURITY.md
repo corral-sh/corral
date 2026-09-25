@@ -4,7 +4,7 @@
 
 Each project gets its own Linux virtual machine (Apple Virtualization
 framework via Lima). The agent runs inside that VM as your user, with `sudo`
-unless `network = "offline"` removed it. The VM sees:
+unless `network = "broker"` or `"offline"` removed it (with the root-equivalent groups). The VM sees:
 
 | Inside the box | Source | Mode |
 |---|---|---|
@@ -114,7 +114,9 @@ each. They are the items to weigh before running an untrusted repository.
   Nothing on the Mac is exposed unless a service listens on all interfaces.
   `network = "offline"` rejects all egress inside the guest except the Lima
   gateway subnet (`192.168.5.0/24`: the Mac and DNS) via nftables, and
-  removes the box user's `sudo` so the agent cannot lift it; the rule is applied
+  removes the box user's `sudo` and root-equivalent groups (`docker`, `lxd`,
+  `incus-admin`, `disk`; the docker socket is made root-only too) so the agent
+  cannot lift it — before any repository `provision` script runs; the rule is applied
   after provisioning finishes and re-applied before every session (the session
   refuses to start otherwise). This is enforced *inside* the boundary, so it is
   weaker than a host-side allow-list (planned) — but with `sudo` gone it
@@ -122,7 +124,9 @@ each. They are the items to weigh before running an untrusted repository.
 * Exfiltrate anything it can read: the project and any forwarded secret.
   Forward the narrowest token that works (`env_from_host`).
 * Undo in-guest controls with `sudo` — the `hide` shadow and the git-metadata
-  shadow included — unless `network = "offline"`, which removes it. The VM is
+  shadow included — unless `network = "offline"` or `"broker"`, which remove it
+  together with every group that is root by another name (`docker`: a container
+  can mount `/`). The VM is
   the boundary; in-guest policy is hygiene against accidental exposure (an
   agent `cat .env`-ing into a prompt), not a defence against a hostile one.
 

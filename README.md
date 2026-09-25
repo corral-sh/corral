@@ -396,7 +396,8 @@ doctor` tells you if Rosetta is not installed on the Mac.
 `network = "offline"` (or `--offline`) is for review and audit sessions: once
 provisioning has finished, nftables inside the box rejects every outbound
 connection except to the Mac (`host.lima.internal`), and the box user's `sudo`
-is removed so the agent cannot lift the rule. The box is fully provisioned
+and every root-equivalent group (`docker`, `lxd`, `disk`) are removed so the agent cannot lift the
+rule — before any repository `provision` script runs, and again before every session. The box is fully provisioned
 first, so toolchains and the agent still install; anything else must be added
 via `packages` / `provision` and an `corral rebuild`. A project may set this
 but never unset it.
@@ -480,6 +481,11 @@ toolchains = ["docker"]
 docker run --rm -v "$PWD":/w -w /w alpine:3.20 sh -c 'apk add build-base && make'
 ```
 
+Under `network = "broker"` or `"offline"` the box user is **not** in the `docker` group and the
+socket is root-only: the daemon runs containers as root with any path mounted, so the group is root
+by another name, and those modes exist to take root away. Docker is still installed; the agent
+just cannot drive it. Use `network = "full"` for container work.
+
 Anything else: `packages = [...]` (apt) or a `provision` script. The agent can
 also `sudo apt install` whatever it needs during a session.
 
@@ -488,7 +494,9 @@ also `sudo apt install` whatever it needs during a session.
 `provision = ["scripts/box-setup.sh"]` runs repository scripts at the end of provisioning
 (they re-run on every boot, so keep them idempotent). A script runs **as the box user**; add the
 line `# corral: system` to run it as root — allowed in `network = "full"` only, because in
-offline/broker mode a repository must not be able to pre-empt the in-guest controls. Every script
+offline/broker mode a repository must not be able to pre-empt the in-guest controls. For the
+same reason a script there runs **without `sudo` or the `docker` group** — they are dropped before
+project scripts run; install system packages with `packages = [...]` instead. Every script
 gets a generated header, so these are always defined:
 
 | Variable | Value |

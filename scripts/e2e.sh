@@ -38,8 +38,11 @@ echo "── e2e: $("$BIN" version | head -1)  home=$CORRAL_HOME"
 
 # ── Box A: mount mode with hide, git-metadata shadow, broker network, isolated agent state
 A="$WORK/alpha"; export A
-( mkdir -p "$A/secrets" && cd "$A" && git init -q && echo 'TOKEN=supersecret' > .env && echo x > secrets/k && echo '# hello' > README.md
-  printf 'hide = [".env", "secrets/"]\nbox_dirs = ["node_modules"]\nnetwork = "broker"\nagent_state = "isolated"\nsnapshot = "auto"\n' > .corral.toml
+# toolchains = ["docker"] and the provision script come from the repository's own file: a
+# root-equivalent group re-granted by a project-ok key must not bring root back.
+( mkdir -p "$A/secrets" "$A/scripts" && cd "$A" && git init -q && echo 'TOKEN=supersecret' > .env && echo x > secrets/k && echo '# hello' > README.md
+  printf '#!/bin/bash\nmkdir -p "$HOME/.corral"\n{ sudo -n true 2>/dev/null && echo sudo; docker info >/dev/null 2>&1 && echo docker; echo done; } > "$HOME/.corral/e2e-provision-privileges"\n' > scripts/probe.sh
+  printf 'hide = [".env", "secrets/"]\nbox_dirs = ["node_modules"]\nnetwork = "broker"\nagent_state = "isolated"\nsnapshot = "auto"\ntoolchains = ["docker"]\nprovision = ["scripts/probe.sh"]\n' > .corral.toml
   git add -A && git -c user.email=e2e@example.com -c user.name=e2e commit -qm init )
 echo "── box A (mount · hide · broker · isolated): first start builds the golden image"
 check "box A starts"                                    '"$BIN" -C "$A" up'
@@ -60,6 +63,11 @@ check "broker: denied host refused by the proxy (403 on CONNECT)" 'guest "$A" "c
 check "broker: direct connection bypassing the proxy is rejected" 'guest "$A" "curl -s -o /dev/null --noproxy \"*\" --max-time 8 https://1.1.1.1/; echo exit=\$?" | grep -qE "exit=(7|28)"'
 check "broker: DNS is not available in the guest"       '! guest "$A" "getent hosts example.com" >/dev/null 2>&1'
 check "sudo removed from the box user"                  '! guest "$A" "sudo -n true" >/dev/null 2>&1'
+check "box user is not in the docker group"            '! guest "$A" "id -nG" | tr " " "\n" | grep -qx docker'
+check "the docker daemon refuses the box user"         '! guest "$A" "docker info" >/dev/null 2>&1'
+check "docker socket is root-only (no stale gid reaches it)" 'guest "$A" "stat -c %U:%G /run/docker.sock" | grep -qx root:root'
+check "the repo provision script ran without sudo or docker" '[ "$(guest "$A" "cat ~/.corral/e2e-provision-privileges")" = done ]'
+check "preflight reports the privileges control as passing" '"$BIN" -C "$A" run --preflight -- true 2>&1 | grep -E "control privileges" | tee /dev/stderr | grep -q "✓"'
 check "denial recorded: corral egress lists example.com" '"$BIN" -C "$A" egress | grep -q example.com:443'
 check "stop box A"                                      '"$BIN" -C "$A" stop'
 # Scoped to this run's box: another box of the developer's may legitimately have a broker running.
@@ -73,12 +81,13 @@ check "broker lockdown active again after the restore"   'guest "$A" "systemctl 
 
 # ── Box B: offline
 B="$WORK/beta"; export B
-( mkdir -p "$B" && cd "$B" && git init -q && printf 'network = "offline"\n' > .corral.toml )
+( mkdir -p "$B" && cd "$B" && git init -q && printf 'network = "offline"\ntoolchains = ["docker"]\n' > .corral.toml )
 echo "── box B (offline): clone of the golden"
 check "box B starts"                                    '"$BIN" -C "$B" up'
 check "offline: egress rejected"                        'guest "$B" "curl -s -o /dev/null --max-time 8 https://1.1.1.1/; echo exit=\$?" | grep -qE "exit=(7|28)"'
 check "offline: the Mac (gateway) is still reachable"   'guest "$B" "getent hosts host.lima.internal" | grep -q 192.168.5.2'
 check "offline: sudo removed"                           '! guest "$B" "sudo -n true" >/dev/null 2>&1'
+check "offline: box user is not in the docker group" '! guest "$B" "id -nG" | tr " " "\n" | grep -qx docker'
 check "info shows no config drift"                      '! "$BIN" -C "$B" info | grep -q "configuration changed"'
 
 echo "── $PASS passed, $FAIL failed"

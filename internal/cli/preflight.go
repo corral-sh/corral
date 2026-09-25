@@ -75,6 +75,21 @@ func boxPreflight(ctx context.Context, b *box.Box, hostEnv map[string]string) []
 		}
 		out = append(out, check{"control " + unit, state == "active", state, "corral shell, then journalctl -u corral-" + unit})
 	}
+	// A locked-down box leaves the user no path to root — no sudo, no
+	// root-equivalent group (the docker daemon mounts / into any container).
+	// `id -nG "$(id -un)"` reads the group database, which is what a session's
+	// login uses: this probe itself runs over Lima's multiplexed SSH master,
+	// whose process may still carry gids from before the drop — the socket
+	// check covers a stale gid.
+	if b.Cfg.Network != config.NetworkFull {
+		o, _ := guest("sudo -n true 2>/dev/null && echo sudo; id -nG \"$(id -un)\" | tr ' ' '\\n' | grep -xE 'sudo|admin|docker|lxd|incus-admin|disk'; [ -S /run/docker.sock ] && [ -w /run/docker.sock ] && echo docker.sock; true")
+		held := strings.Join(strings.Fields(o), ", ")
+		detail := "no sudo, no root-equivalent group"
+		if held != "" {
+			detail = "box user still holds: " + held
+		}
+		out = append(out, check{"control privileges", held == "", detail, "corral rebuild " + b.Name})
+	}
 	// api_brokers: the route must answer from inside the box. A 403
 	// from the broker itself ("api-denied") still proves the path works.
 	for _, ab := range b.Cfg.APIBrokers {

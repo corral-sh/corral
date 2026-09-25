@@ -137,7 +137,7 @@ var toolchainDocs = map[string]string{
 	"node":    "Node.js 22 LTS from nodejs.org (SHA-256 verified), npm `min-release-age = 7`.",
 	"go":      "Latest stable Go from go.dev (SHA-256 verified).",
 	"python":  "Python 3, pip, venv, pipx (Ubuntu apt).",
-	"docker":  "Docker Engine + compose + buildx inside the box; the box user is in the docker group.",
+	"docker":  "Docker Engine + compose + buildx inside the box; the box user is in the docker group — except under `network = \"broker\"`/`\"offline\"`, where that group is root-equivalent and is removed.",
 	"java":    "OpenJDK 17, JAVA_HOME.",
 	"android": "Android SDK cmdline-tools (SHA-256 pinned), platform-tools, android-35, build-tools 35.0.0, JDK; amd64 multiarch so aapt2 runs under Rosetta.",
 	"flutter": "Flutter stable (3.47.1 by default; `toolchain_versions` pins another release), release commit pinned and verified, Dart + Android artifacts precached.",

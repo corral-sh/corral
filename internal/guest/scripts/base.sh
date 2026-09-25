@@ -6,6 +6,21 @@ export DEBIAN_FRONTEND=noninteractive
 echo "[corral] base provisioning started"
 
 # ---------------------------------------------------------------------------
+# No unattended package installer inside a box: Ubuntu's apt timers try to
+# download and install .debs on a schedule. The broker refuses them, but a box
+# with wider egress would have its toolchain changed under a running agent.
+# Masked, not merely disabled, so an `apt` package upgrade cannot switch them
+# back on; the apt.conf lines make apt.systemd.daily exit early regardless.
+# Runs before our own apt-get so a timer cannot race the provisioning run.
+# ---------------------------------------------------------------------------
+systemctl disable --now apt-daily.timer apt-daily-upgrade.timer >/dev/null 2>&1 || true
+systemctl mask apt-daily.timer apt-daily-upgrade.timer apt-daily.service apt-daily-upgrade.service >/dev/null 2>&1 || true
+cat >/etc/apt/apt.conf.d/20auto-upgrades <<'EOF'
+APT::Periodic::Update-Package-Lists "0";
+APT::Periodic::Unattended-Upgrade "0";
+EOF
+
+# ---------------------------------------------------------------------------
 # Packages: everything here comes from Ubuntu's signed archive.
 # ---------------------------------------------------------------------------
 apt-get update

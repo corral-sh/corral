@@ -120,7 +120,9 @@ each. They are the items to weigh before running an untrusted repository.
   after provisioning finishes and re-applied before every session (the session
   refuses to start otherwise). This is enforced *inside* the boundary, so it is
   weaker than a host-side allow-list (planned) — but with `sudo` gone it
-  takes a kernel or guest-agent bug to undo, not a shell command.
+  takes a kernel or guest-agent bug to undo, not a shell command. Ubuntu's
+  unattended apt timers are masked at provisioning: nothing installs
+  packages into a box except provisioning and the agent, on purpose.
 * Exfiltrate anything it can read: the project and any forwarded secret.
   Forward the narrowest token that works (`env_from_host`).
 * Undo in-guest controls with `sudo` — the `hide` shadow and the git-metadata

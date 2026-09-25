@@ -200,7 +200,22 @@ func SaveMeta(m *Meta) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(dir, m.Name+".json"), data, 0o600)
+	// Atomic replace: several processes read and write a box's metadata at
+	// once (the launcher, the broker child it just spawned, a concurrent
+	// session, the idle sweep). A truncate-then-write left a window in which
+	// a reader saw an empty file — the broker child then failed with
+	// "unknown box" and the session was refused as sealed. The temp name does
+	// not end in .json, so AllMeta never lists it.
+	final := filepath.Join(dir, m.Name+".json")
+	tmp := fmt.Sprintf("%s.tmp-%d", final, os.Getpid())
+	if err := os.WriteFile(tmp, data, 0o600); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp, final); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	return nil
 }
 
 // DeleteMeta removes the metadata file (ignoring absence).

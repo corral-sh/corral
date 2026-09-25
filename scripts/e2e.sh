@@ -70,6 +70,10 @@ check "the repo provision script ran without sudo or docker" '[ "$(guest "$A" "c
 check "preflight reports the privileges control as passing" '"$BIN" -C "$A" run --preflight -- true 2>&1 | grep -E "control privileges" | tee /dev/stderr | grep -q "✓"'
 check "apt-daily timers are masked"                     'guest "$A" "systemctl is-enabled apt-daily.timer apt-daily-upgrade.timer; true" | grep -cx masked | grep -qx 2'
 check "denial recorded: corral egress lists example.com" '"$BIN" -C "$A" egress | grep -q example.com:443'
+check "egress log: allowed destination recorded"      '"$BIN" -C "$A" egress --log | grep -q "api.anthropic.com:443 allowed"'
+check "egress log: denied destination recorded"       '"$BIN" -C "$A" egress --log | grep -q "example.com:443 denied"'
+check "egress log: session markers present"           '"$BIN" -C "$A" egress --log | grep -q " session start " && "$BIN" -C "$A" egress --log | grep -q " session end "'
+check "egress --json: destinations summarised"        '"$BIN" -C "$A" egress --json | python3 -c "import json,sys; d=json.load(sys.stdin); h={x[\"host\"]:x for x in d[\"destinations\"]}; assert h[\"api.anthropic.com:443\"][\"allowed\"] and not h[\"example.com:443\"][\"allowed\"] and d[\"sessions\"]>=1"'
 check "stop box A"                                      '"$BIN" -C "$A" stop'
 # Scoped to this run's box: another box of the developer's may legitimately have a broker running.
 check "broker process gone after stop"                  '! pgrep -f "corral broker --box alpha-" >/dev/null'

@@ -25,8 +25,8 @@ repositories are not there. A repository's own config can shape the guest but ne
 | `corral delete [box]` | Box lifecycle | Delete a box (VM disk); the project and agent login are kept |
 | `corral docs` | Insight & setup | Print the feature catalog (every command, config key, mode, control) — for humans and AI assistants |
 | `corral doctor [box]` | Insight & setup | Check the host; with a box name, preflight what the project declared from inside the box |
-| `corral egress [box]` | Insight & setup | Show a box's network mode, allowed destinations and recent denials |
-| `corral gc` | Box lifecycle | Stop boxes idle longer than their idle_stop (also runs on launch and in the dashboard; `list` never stops anything) |
+| `corral egress [box]` | Insight & setup | Show a box's network mode, allowed destinations, what it reached and what was refused |
+| `corral gc` | Box lifecycle | Stop boxes idle longer than their idle_stop (the sweep also runs on launch and in the dashboard; `list` never stops anything) and remove egress logs of boxes deleted more than 14 days ago |
 | `corral golden` | Box lifecycle | Golden images: provisioned once per toolchain set, cloned per project |
 | `corral golden build` |  | Build (or verify) the golden image for this project's configuration |
 | `corral golden prune` |  | Delete golden images no existing box was cloned from (also runs after upgrade and golden build) |
@@ -126,8 +126,9 @@ What enforces the configuration inside the box (systemd units, re-applied before
 | `corral-hide` | Empty box-owned file/tmpfs over each `hide` path. |
 | `corral-boxdirs` | Box-disk directory bind-mounted over each `box_dirs` path. |
 | `provision failure record` | A repository provision script that exits non-zero is recorded in `/corral/runtime/provision/`; corral refuses to start after create/start. |
-| `egress broker (host)` | Per-box CONNECT/forward proxy on `127.0.0.1:<port>`, allow-list decided on the Mac, denials audited by name (`corral egress`). |
+| `egress broker (host)` | Per-box CONNECT/forward proxy on `127.0.0.1:<port>`, allow-list decided on the Mac; every attempted destination — allowed or denied — and every `api_brokers` call is recorded by name in the box's egress log (`corral egress`). |
 | `audit log` | `~/.corral/logs/sessions.jsonl`: launches, variable *names*, denials, snapshots, deletes (`corral audit`). |
+| `egress log` | `~/.corral/logs/egress-<box>.jsonl`: one line per connection the box attempted through its broker (host:port, allowed/denied), per `api_brokers` call (method, path, status) and per session start/end; kept 14 days after the box is deleted, rotated at 16 MiB (`corral egress --log`). |
 
 ## Toolchains
 
@@ -168,6 +169,7 @@ What enforces the configuration inside the box (systemd units, re-applied before
 | `~/.corral/agents/<agent>/` | Shared agent login/state. |
 | `~/.corral/snapshots/<box>/` | APFS-clone snapshots. |
 | `~/.corral/ssh/config` | One `Include` per box for `corral code` / `ssh lima-<box>`. |
+| `~/.corral/logs/` | `sessions.jsonl` (audit), `egress-<box>.jsonl` (per-box egress log), `broker-<box>.log` (broker child output). |
 
 ## Exit codes and outcomes
 

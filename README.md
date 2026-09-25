@@ -154,7 +154,7 @@ pick it up.
 | `corral stop [--all]` | Free the RAM; next start ≈ 20 s |
 | `corral rebuild` | Apply config changes (resources, toolchains, mounts) |
 | `corral code` | Open the project *inside the box* in VS Code (`--editor cursor` / `jetbrains`) over SSH |
-| `corral egress` | Network mode, allowed destinations and recent denials (`network = "broker"`) |
+| `corral egress` | Network mode, allow-list, every destination the box attempted (allowed/denied, with counts) and its API-broker calls; `--log` for the raw per-box record |
 | `corral snapshot create <tag>` | Snapshot the box disk (APFS clone, instant); `restore` rolls back |
 | `corral undo` | Roll back to the snapshot taken at the last session start (`snapshot = "auto"`) |
 | `corral audit` | Who launched what, where, with which variables |
@@ -305,7 +305,12 @@ Defaults are the agents' API and login hosts (`api.anthropic.com`, `*.anthropic.
 works (apt, npm, pip, go, git over https, curl, Claude Code); anything that ignores it fails, which is
 the control working. SSH-based git is not carried — use `git_tokens` over https. The broker is a
 child process started with the box and stopped with it (no daemon); a session refuses to start if it
-is not answering. Denied destinations are audited by name: `corral egress` shows them and the fix.
+is not answering. Every destination the box **attempts** through the broker — allowed or denied — is
+recorded by name in `~/.corral/logs/egress-<box>.jsonl`, with a marker per session, so "what did that
+run try to reach?" is answered after the fact: `corral egress` shows the destinations deduplicated with
+counts (denied first) and the fix for a blocked install; `corral egress <box> --log` prints the record
+in order, `--since 24h` narrows it, `--json` feeds a supervisor. The log outlives the box (`gc` removes
+it 14 days after a delete).
 Provisioning (toolchains, packages, project scripts) still runs online on first boot; the lockdown
 follows it.
 
@@ -341,8 +346,8 @@ curl -s -X DELETE "$CORRAL_API_GITLAB/api/v4/projects/42"                    # 4
 The broker on the Mac matches method + path against `allow` (`*` one segment, `**` the rest), drops
 any credential the box sent, adds the real one and forwards over TLS. The token is never in the box's
 environment, files or process list; a compromised session can make exactly the listed calls and no
-other. Every call is audited — method, path, status, never a body — and `corral egress <box>` shows
-the routes, counts and recent denials. Works in `network = "full"` and `"broker"` (the route uses the
+other. Every call is audited — method, path, status, never a body — in the audit log and in the box's
+egress log, and `corral egress <box>` shows the routes, counts and recent denials. Works in `network = "full"` and `"broker"` (the route uses the
 same gateway port the firewall already permits); `doctor <box>` probes each route. Not available in
 `offline`.
 

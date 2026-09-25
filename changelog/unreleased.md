@@ -4,6 +4,7 @@
 
 ### Added
 
+- **Per-box egress log** (#15). Every box with a broker (`network = "broker"`, or `api_brokers`) now gets `~/.corral/logs/egress-<box>.jsonl`: one line per connection the box **attempted** through the broker — `host:port` and `allowed`/`denied` — plus every `api_brokers` call (route, method, path, upstream status) and a `session start`/`end` marker with the session id and exit code, so one run's traffic can be sliced out of a long-lived box. Until now the broker only counted allowed connections and audited denials, so "a box ran untrusted dependency code — what did it try to reach?" had no answer. Names only, never payloads. `corral egress <box>` gains a **Destinations attempted** section (deduplicated, denied first, with counts and last-seen), plus `--log` (the record in order, `<time> <box> <host:port> allowed|denied`), `--since 2h` and `--json`. The log is rotated at 16 MiB (one generation kept) and outlives the box on purpose; `corral gc` removes a deleted box's log after 14 days. The audit log (`sessions.jsonl`) is unchanged. No template change.
 - Contributor workflow: issue forms with status labels, a pull request template, a Code of Conduct, Dependabot, and an issue-first process documented in CONTRIBUTING.md. `main` is protected: every change lands via pull request with all CI checks green, so a work item is never closed by a broken build.
 
 ### Changed

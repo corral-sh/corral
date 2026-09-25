@@ -306,6 +306,10 @@ func launch(ctx context.Context, a agent.Agent, argv []string, lf *launchFlags) 
 	b.Touch()
 	start := time.Now()
 	box.Audit(box.AuditEvent{Event: "launch", Box: b.Name, Project: b.Project, Agent: agentName, Argv: spec.Argv, Yolo: &yolo, Forwarded: spec.Forwarded})
+	if box.NeedsBroker(b.Cfg) {
+		// Session markers let the per-box egress log be read per run.
+		box.LogEgress(box.EgressRecord{Box: b.Name, Kind: "session", Event: "start", Agent: agentName, Session: spec.Env["CORRAL_SESSION"]})
+	}
 	if ui.IsTTY() {
 		if a != nil {
 			// An agent session gets the greeting card; shell/run stay terse.
@@ -356,6 +360,9 @@ func launch(ctx context.Context, a agent.Agent, argv []string, lf *launchFlags) 
 	}
 	dur := time.Since(start).Truncate(time.Second).String()
 	box.Audit(box.AuditEvent{Event: "exit", Box: b.Name, Agent: agentName, ExitCode: &code, Duration: dur, Outcome: outcome})
+	if box.NeedsBroker(b.Cfg) {
+		box.LogEgress(box.EgressRecord{Box: b.Name, Kind: "session", Event: "end", Agent: agentName, Session: spec.Env["CORRAL_SESSION"], ExitCode: &code})
+	}
 	writeResult(lf.result, runResult{Box: b.Name, Project: b.Project, Agent: agentName, Outcome: outcome, ExitCode: code, Reason: reason,
 		Started: start, Ended: time.Now(), Duration: dur, Forwarded: spec.Forwarded})
 

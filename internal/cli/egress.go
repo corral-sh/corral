@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -37,10 +38,18 @@ func newBrokerCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			// Every decision goes to the per-box egress log; denials and
+			// API calls also stay in the audit log, which the dashboard reads.
+			box.RotateEgressLog(b.Name)
 			srv := &broker.Server{
 				Allow: allow,
 				OnDeny: func(host string, port int) {
-					box.Audit(box.AuditEvent{Event: "egress-denied", Box: b.Name, Host: fmt.Sprintf("%s:%d", host, port)})
+					hp := fmt.Sprintf("%s:%d", host, port)
+					box.Audit(box.AuditEvent{Event: "egress-denied", Box: b.Name, Host: hp})
+					box.LogEgressConnect(b.Name, hp, false)
+				},
+				OnAllow: func(host string, port int) {
+					box.LogEgressConnect(b.Name, fmt.Sprintf("%s:%d", host, port), true)
 				},
 				APIs: map[string]*broker.APIRoute{},
 				OnAPI: func(api, method, path string, status int, allowed bool) {
@@ -49,6 +58,7 @@ func newBrokerCmd() *cobra.Command {
 						ev = "api-denied"
 					}
 					box.Audit(box.AuditEvent{Event: ev, Box: b.Name, Host: api, Argv: []string{method, path}, Status: status})
+					box.LogEgressAPI(b.Name, api, method, path, status, allowed)
 				},
 			}
 			if b.Cfg.Network != config.NetworkBroker {
@@ -90,29 +100,143 @@ func newBrokerCmd() *cobra.Command {
 
 func newEgressCmd() *cobra.Command {
 	var n int
+	var showLog, jsonOut bool
+	var since time.Duration
 	cmd := &cobra.Command{
 		Use:     "egress [box]",
-		Short:   "Show a box's network mode, allowed destinations and recent denials",
+		Short:   "Show a box's network mode, allowed destinations, what it reached and what was refused",
 		GroupID: "insight",
 		Long: `For network = "broker": the allow-list the proxy on your Mac enforces for this
-box, whether the broker is running, and the destinations it refused (names
-only). A blocked install shows up here as an egress-denied line; add the host
-to egress in ~/.corral/config.toml or ~/.corral/projects/<box>.toml and
-run corral restart <box>.`,
+box, whether the broker is running, every destination the box attempted through
+it — allowed or denied, deduplicated with counts — and the api_brokers calls it
+made (names, methods, paths and statuses only; never payloads).
+
+The record behind it is ~/.corral/logs/egress-<box>.jsonl: one line per
+attempted connection, per API call, and a marker at each session start and end
+so a run can be sliced out. --log prints it in order; --since 24h limits both
+views; --json is for scripts. The file is kept when the box is deleted
+(corral gc removes it after 14 days) and rotated at 16 MiB.
+
+A blocked install shows up as a denied destination; add the host to egress in
+~/.corral/config.toml or ~/.corral/projects/<box>.toml and run
+corral restart <box>.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			b, err := resolveBoxArg(args)
 			if err != nil {
 				return err
 			}
-			return printEgress(cmd.Context(), b, n)
+			var from time.Time
+			if since > 0 {
+				from = time.Now().Add(-since)
+			}
+			if showLog {
+				return printEgressLog(b, from, jsonOut)
+			}
+			if jsonOut {
+				records, err := box.ReadEgressLog(b.Name, from)
+				if err != nil {
+					return err
+				}
+				return printJSON(egressJSON(b, records))
+			}
+			return printEgress(cmd.Context(), b, n, from)
 		},
 	}
-	cmd.Flags().IntVar(&n, "denials", 20, "how many recent denials to show")
+	cmd.Flags().IntVar(&n, "denials", 20, "how many recent denials and API calls to show")
+	cmd.Flags().BoolVar(&showLog, "log", false, "print the egress log line by line (oldest first) instead of the summary")
+	cmd.Flags().DurationVar(&since, "since", 0, "only records newer than this (e.g. 2h, 30m); 0 = everything on file")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "machine-readable output (destinations summary, or records with --log)")
 	return cmd
 }
 
-func printEgress(_ context.Context, b *box.Box, n int) error {
+// egressReport is `corral egress --json`: the box's mode and allow-list
+// plus every destination it attempted, deduplicated.
+type egressReport struct {
+	Box          string                  `json:"box"`
+	Network      string                  `json:"network"`
+	Allow        []string                `json:"allow"`
+	Log          string                  `json:"log"`
+	Since        *time.Time              `json:"since,omitempty"`
+	Sessions     int                     `json:"sessions"`
+	Destinations []box.EgressDestination `json:"destinations"`
+}
+
+func egressJSON(b *box.Box, records []box.EgressRecord) egressReport {
+	r := egressReport{Box: b.Name, Network: b.Cfg.Network, Allow: box.EgressHosts(b.Cfg), Destinations: box.SummarizeEgress(records)}
+	if r.Allow == nil {
+		r.Allow = []string{}
+	}
+	if r.Destinations == nil {
+		r.Destinations = []box.EgressDestination{}
+	}
+	r.Log, _ = box.EgressLogPath(b.Name)
+	for _, rec := range records {
+		if rec.Kind == "session" && rec.Event == "start" {
+			r.Sessions++
+		}
+	}
+	if len(records) > 0 {
+		t := records[0].Time
+		r.Since = &t
+	}
+	return r
+}
+
+// printEgressLog renders the raw log, one line per record, in the shape the
+// tester asked for: <time> <box> <destination> allowed|denied.
+func printEgressLog(b *box.Box, from time.Time, jsonOut bool) error {
+	records, err := box.ReadEgressLog(b.Name, from)
+	if err != nil {
+		return err
+	}
+	if jsonOut {
+		if records == nil {
+			records = []box.EgressRecord{}
+		}
+		return printJSON(records)
+	}
+	if len(records) == 0 {
+		p, _ := box.EgressLogPath(b.Name)
+		fmt.Println(ui.Subtle.Render("no egress recorded for " + b.Name + " (" + ui.ShortenHome(p) + ")"))
+		return nil
+	}
+	for _, r := range records {
+		fmt.Println(egressLine(r))
+	}
+	return nil
+}
+
+func egressLine(r box.EgressRecord) string {
+	ts := r.Time.Format("2006-01-02 15:04:05")
+	verdict := func() string {
+		if r.Allowed != nil && *r.Allowed {
+			return "allowed"
+		}
+		return "denied"
+	}
+	switch r.Kind {
+	case "connect":
+		return fmt.Sprintf("%s %s %s %s", ts, r.Box, r.Host, verdict())
+	case "api":
+		return fmt.Sprintf("%s %s api:%s %s %s %d %s", ts, r.Box, r.Host, r.Method, r.Path, r.Status, verdict())
+	case "session":
+		detail := r.Event
+		if r.Agent != "" {
+			detail += " " + r.Agent
+		}
+		if r.Session != "" {
+			detail += " " + r.Session
+		}
+		if r.ExitCode != nil {
+			detail += fmt.Sprintf(" exit=%d", *r.ExitCode)
+		}
+		return fmt.Sprintf("%s %s session %s", ts, r.Box, detail)
+	}
+	return fmt.Sprintf("%s %s %s %s", ts, r.Box, r.Kind, r.Host)
+}
+
+func printEgress(_ context.Context, b *box.Box, n int, from time.Time) error {
 	fmt.Println(ui.Header.Render("Egress · " + b.Name))
 	ui.KV(os.Stdout, "network", networkLine(b))
 	if !box.NeedsBroker(b.Cfg) {
@@ -180,6 +304,9 @@ func printEgress(_ context.Context, b *box.Box, n int) error {
 	for _, h := range box.EgressHosts(b.Cfg) {
 		fmt.Println("  " + h)
 	}
+	if err := printEgressDestinations(b, from); err != nil {
+		return err
+	}
 	var denials []box.AuditEvent
 	for _, e := range events {
 		if e.Event == "egress-denied" && e.Box == b.Name {
@@ -198,5 +325,39 @@ func printEgress(_ context.Context, b *box.Box, n int) error {
 		fmt.Printf("  %s  %s\n", ui.Subtle.Render(d.Time.Format("2006-01-02 15:04:05")), d.Host)
 	}
 	fmt.Println(ui.Subtle.Render("  To allow one: add it to egress in ~/.corral/projects/" + b.Name + ".toml, then corral restart " + b.Name))
+	return nil
+}
+
+// printEgressDestinations is the "Destinations attempted" section: every destination the box
+// attempted through its broker, deduplicated, denied first — the measurement
+// behind "which hosts does this repository actually need?".
+func printEgressDestinations(b *box.Box, from time.Time) error {
+	records, err := box.ReadEgressLog(b.Name, from)
+	if err != nil {
+		return err
+	}
+	logPath, _ := box.EgressLogPath(b.Name)
+	scope := "all on file"
+	if !from.IsZero() {
+		scope = "since " + from.Format("2006-01-02 15:04")
+	}
+	dests := box.SummarizeEgress(records)
+	fmt.Println(ui.Header.Render(fmt.Sprintf("Destinations attempted (%d)", len(dests))) + ui.Subtle.Render("  "+scope+" · "+ui.ShortenHome(logPath)))
+	if len(dests) == 0 {
+		fmt.Println(ui.Subtle.Render("  none recorded yet — connections the box makes through the broker appear here, allowed or not"))
+		return nil
+	}
+	for _, d := range dests {
+		mark, word := ui.Ok.Render("✓"), "allowed"
+		if !d.Allowed {
+			mark, word = ui.Bad.Render("✗"), "denied"
+		}
+		host := d.Host
+		if d.Kind == "api" {
+			host = "api:" + d.Host
+		}
+		fmt.Printf("  %s %-44s %s  %s\n", mark, host, ui.Subtle.Render(fmt.Sprintf("%-7s ×%-5d", word, d.Count)), ui.Subtle.Render("last "+d.Last.Format("2006-01-02 15:04:05")))
+	}
+	fmt.Println(ui.Subtle.Render("  corral egress " + b.Name + " --log prints every attempt in order; --since 24h narrows; --json for scripts"))
 	return nil
 }

@@ -1017,10 +1017,18 @@ func TestSaveMetaIsAtomic(t *testing.T) {
 	if err := SaveMeta(&Meta{Name: "atom", Project: "/p"}); err != nil {
 		t.Fatal(err)
 	}
-	done := make(chan struct{})
+	// The writer must never outlive the test: once t.Setenv restores
+	// CORRAL_HOME, a late SaveMeta would land in the developer's real home.
+	// So a failed read stops the writer and waits for it instead of t.Fatal.
+	done, stop := make(chan struct{}), make(chan struct{})
 	go func() {
 		defer close(done)
 		for i := range 300 {
+			select {
+			case <-stop:
+				return
+			default:
+			}
 			if err := SaveMeta(&Meta{Name: "atom", Project: fmt.Sprintf("/p/%d", i)}); err != nil {
 				t.Error(err)
 				return
@@ -1034,7 +1042,10 @@ func TestSaveMetaIsAtomic(t *testing.T) {
 		default:
 		}
 		if m, err := LoadMeta("atom"); err != nil || m.Project == "" {
-			t.Fatalf("reader saw a partial file: %v", err)
+			t.Errorf("reader saw a partial file: %v", err)
+			close(stop)
+			<-done
+			return
 		}
 	}
 	dir, _ := paths.BoxesDir()

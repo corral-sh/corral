@@ -119,3 +119,50 @@ func TestRecordedProvisionScript(t *testing.T) {
 		t.Errorf("record: %s", rec)
 	}
 }
+
+// TestDropPrivilegesHelper runs the installed corral-drop-privileges helper
+// against stub getent/gpasswd: a group the image lacks (getent exits 2) must not
+// fail the lockdown, and a member that stays behind must. The first
+// version died on the absent incus-admin group under set -e and every broker
+// session refused to start.
+func TestDropPrivilegesHelper(t *testing.T) {
+	s := Script("drop-privileges")
+	start := strings.Index(s, "<<'DROP_EOF'\n")
+	end := strings.Index(s, "\nDROP_EOF\n")
+	if start < 0 || end < start {
+		t.Fatal("helper heredoc not found")
+	}
+	dir := t.TempDir()
+	helper := filepath.Join(dir, "helper.sh")
+	body := s[start+len("<<'DROP_EOF'\n") : end+1]
+	// The helper's only absolute paths are the sudoers file and the docker socket.
+	body = strings.ReplaceAll(body, "/etc/sudoers.d/90-cloud-init-users", filepath.Join(dir, "sudoers"))
+	body = strings.ReplaceAll(body, "/run/docker.sock", filepath.Join(dir, "docker.sock"))
+	if err := os.WriteFile(helper, []byte(body), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	stub := filepath.Join(dir, "bin")
+	_ = os.Mkdir(stub, 0o755)
+	write := func(name, src string) {
+		if err := os.WriteFile(filepath.Join(stub, name), []byte(src), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("getent", "#!/bin/bash\ncase \"$2\" in incus-admin) exit 2;; docker) [ -f \"$STATE/removed\" ] && echo docker:x:111: || echo docker:x:111:alice;; *) echo \"$2:x:1:\";; esac\n")
+	write("gpasswd", "#!/bin/bash\n[ -n \"$STICKY\" ] || touch \"$STATE/removed\"\n")
+	run := func(sticky bool) (string, error) {
+		cmd := exec.CommandContext(t.Context(), "bash", helper)
+		cmd.Env = append(os.Environ(), "PATH="+stub+":"+os.Getenv("PATH"), "STATE="+t.TempDir())
+		if sticky {
+			cmd.Env = append(cmd.Env, "STICKY=1")
+		}
+		out, err := cmd.CombinedOutput()
+		return string(out), err
+	}
+	if out, err := run(false); err != nil {
+		t.Fatalf("absent group must not fail the lockdown: %v\n%s", err, out)
+	}
+	if out, err := run(true); err == nil || !strings.Contains(out, "group docker still has members (alice)") {
+		t.Fatalf("a member left in docker must fail closed: err=%v\n%s", err, out)
+	}
+}

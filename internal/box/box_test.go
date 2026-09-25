@@ -956,3 +956,54 @@ func TestSessionBeforeMetadataIsAdopted(t *testing.T) {
 		t.Errorf("SessionStart must not duplicate: %+v", b.Meta.ActiveSessions)
 	}
 }
+
+// Under a locked-down network the box user loses sudo and every
+// root-equivalent group (docker) BEFORE any repository script runs, and the
+// lockdown units re-apply the same drop before every session.
+func TestRenderDropsPrivilegesBeforeProjectScripts(t *testing.T) {
+	project := t.TempDir()
+	_ = os.MkdirAll(filepath.Join(project, "scripts"), 0o755)
+	_ = os.WriteFile(filepath.Join(project, "scripts", "setup.sh"), []byte("#!/bin/bash\necho project-setup\n"), 0o755)
+	for _, net := range config.Networks {
+		b := testBox(t, config.File{Network: &net, Toolchains: []string{"docker"}, Provision: []string{"scripts/setup.sh"}})
+		b.Project = project
+		tpl, err := b.Render()
+		if err != nil {
+			t.Fatal(err)
+		}
+		drop, proj, docker := -1, -1, -1
+		for i, p := range tpl.Provision {
+			switch {
+			case strings.Contains(p.Script, "cat >/opt/corral/bin/corral-drop-privileges"):
+				if p.Mode != "system" {
+					t.Errorf("%s: drop-privileges must run as root", net)
+				}
+				drop = i
+			case strings.Contains(p.Script, "echo project-setup"):
+				proj = i
+			case strings.Contains(p.Script, "usermod -aG docker"):
+				docker = i
+			}
+		}
+		if net == config.NetworkFull {
+			if drop != -1 {
+				t.Error("full network keeps sudo: no drop-privileges step")
+			}
+			continue
+		}
+		if drop == -1 || proj == -1 || docker == -1 {
+			t.Fatalf("%s: drop=%d project=%d docker=%d", net, drop, proj, docker)
+		}
+		if docker >= drop || drop >= proj {
+			t.Errorf("%s: order must be docker toolchain (%d) < drop (%d) < project script (%d)", net, docker, drop, proj)
+		}
+	}
+	for _, name := range []string{"broker", "offline"} {
+		if !strings.Contains(guest.Script(name), "\n/opt/corral/bin/corral-drop-privileges\n") {
+			t.Errorf("%s lockdown must call corral-drop-privileges before every session", name)
+		}
+	}
+	if s := guest.Script("drop-privileges"); !strings.Contains(s, "docker") || !strings.Contains(s, "exit 1") {
+		t.Error("drop-privileges must cover the docker group and fail closed")
+	}
+}

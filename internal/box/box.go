@@ -485,6 +485,13 @@ func (b *Box) render(golden bool) (*Template, error) {
 		t.Provision = append(t.Provision, Provision{Mode: "system", Script: guest.BoxDirsScript(b.Project, dirs)})
 	}
 
+	// A locked-down box drops the user's sudo and root-equivalent groups (docker)
+	// before any repository script runs: project scripts are user-only there, and
+	// a user who can still sudo or reach the docker daemon is root anyway.
+	if cfg.Network != config.NetworkFull {
+		t.Provision = append(t.Provision, Provision{Mode: "system", Script: guest.Script("drop-privileges")})
+	}
+
 	// Custom provision scripts from project config. The list comes from the
 	// repository, so every entry must be a regular file inside the project —
 	// after resolving symlinks, or a link out of the repo would read any host file.

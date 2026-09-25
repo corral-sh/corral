@@ -137,8 +137,12 @@ func (s *Stats) Snapshot() (allowed, denied int) {
 // Server is one box's broker: the egress allow-list proxy and, when
 // configured, the credential-holding API routes (api.go).
 type Server struct {
-	Allow  AllowList
-	OnDeny func(host string, port int) // audit hook; names only
+	Allow AllowList
+	// Audit hooks, names only (never payloads): OnDeny for a refused
+	// destination, OnAllow for one the list let through (what a box
+	// reached is as much a record as what it was refused).
+	OnDeny  func(host string, port int)
+	OnAllow func(host string, port int)
 	// APIs by name; OnAPI is the audit hook for every API call (method, path,
 	// status, whether the allow-list let it through) — never bodies.
 	APIs  map[string]*APIRoute
@@ -213,7 +217,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (s *Server) decide(host string, port int) bool {
 	ok := s.Allow.Allows(host, port)
 	s.Stats.add(ok)
-	if !ok && s.OnDeny != nil {
+	switch {
+	case ok && s.OnAllow != nil:
+		s.OnAllow(host, port)
+	case !ok && s.OnDeny != nil:
 		s.OnDeny(host, port)
 	}
 	return ok

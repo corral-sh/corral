@@ -3,6 +3,7 @@ package broker
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -71,12 +72,13 @@ func TestProxyEndToEnd(t *testing.T) {
 	plainUp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("plain-ok " + r.URL.Path)) }))
 	defer plainUp.Close()
 
-	var denied []string
+	var denied, allowed []string
 	dialed := map[string]bool{}
 	allow, _ := Parse([]string{"allowed.test", "plain.test:" + port(plainUp.URL)})
 	s := &Server{
-		Allow:  allow,
-		OnDeny: func(h string, p int) { denied = append(denied, h) },
+		Allow:   allow,
+		OnDeny:  func(h string, p int) { denied = append(denied, h) },
+		OnAllow: func(h string, p int) { allowed = append(allowed, fmt.Sprintf("%s:%d", h, p)) },
 		// Names are fake: map them onto the local upstreams.
 		Dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			dialed[addr] = true
@@ -134,6 +136,11 @@ func TestProxyEndToEnd(t *testing.T) {
 	}
 	if a, d := s.Stats.Snapshot(); a != 2 || d != 1 {
 		t.Fatalf("stats allowed=%d denied=%d", a, d)
+	}
+	// every allowed destination is reported to the hook with its port,
+	// so the per-box egress log records what was reached, not only what was refused.
+	if want := []string{"allowed.test:443", "plain.test:" + port(plainUp.URL)}; strings.Join(allowed, " ") != strings.Join(want, " ") {
+		t.Fatalf("allowed hook %v, want %v", allowed, want)
 	}
 }
 

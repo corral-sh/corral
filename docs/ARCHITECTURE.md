@@ -242,7 +242,16 @@ to keeping credentials out of the box altogether.
   termination, allow-list match on exact host or `*.suffix`, port 443/80 only
   by default (`egress = ["host:port"]` to widen), 30 s idle, no caching.
   Loopback bind only. Denied → `403` to the client and an audit event
-  `egress-denied {box, host}`; allowed connects are counted, not logged.
+  `egress-denied {box, host}`. Every decision — allowed or denied — is also
+  appended to the box's **egress log** `~/.corral/logs/egress-<box>.jsonl`
+  as `{time, box, kind: connect, host: "host:port", allowed}`; `api_brokers`
+  calls land there too (`kind: api`, method, path, status) and the launcher
+  writes a `kind: session` marker with the session id at each start and end,
+  so one run's traffic can be sliced out. The audit log stays denials-
+  only because the dashboard reads it whole; the egress log may grow with the
+  box's traffic, is rotated at 16 MiB by the broker child on start (one
+  generation kept) and outlives the box: `gc` removes a deleted box's log
+  after 14 days. Names only, never payloads.
 * **Guest.** `broker.sh` (from `offline.sh`): ruleset accepts `lo`,
   established, `ip daddr 192.168.5.2 tcp dport <port>`; rejects all else
   (DNS included). `/etc/profile.d/corral.sh` and `/etc/environment` set
@@ -252,8 +261,10 @@ to keeping credentials out of the box altogether.
   online first (installs), the lockdown follows the provisioning marker.
 * **UX.** Create summary and `info` show `network broker · N hosts`; the MOTD
   says so; `corral audit` shows denials; `corral egress <box>` lists the
-  live allow-list and recent denials so a blocked install is diagnosable in
-  one command. Error text in the guest is curl/npm's own `403` — the MOTD
+  live allow-list, every destination attempted (deduplicated, denied first,
+  with counts) and recent denials so a blocked install is diagnosable in one
+  command; `--log` prints the egress log in order, `--since 24h` narrows,
+  `--json` is for a supervisor. Error text in the guest is curl/npm's own `403` — the MOTD
   points at the command.
 * **Not covered (say so in SECURITY.md).** SSH-based git (use `git_tokens`
   over https), UDP/QUIC, anything that ignores proxy env (it simply fails —

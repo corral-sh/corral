@@ -189,6 +189,23 @@ exit code and duration. `corral audit` renders it. Guest-side controls log
 to the box's journal (`journalctl -u corral-git-shadow`, `-u corral-hide`,
 `-u corral-offline`).
 
+**What a box tried to reach.** Containment is not detection: a box running a
+compromised dependency may attempt an outbound connection that the broker
+refuses, and the refusal alone is the signal worth keeping. For every box with
+a broker (`network = "broker"`, or `api_brokers`), the broker child on the Mac
+appends each **attempted** destination to `~/.corral/logs/egress-<box>.jsonl`
+— `host:port` and whether it was allowed — together with every `api_brokers`
+call (method, path, upstream status) and a marker at each session start and
+end. Only corral sees attempts: a caller knows what it *permitted*, which is
+a different fact. `corral egress <box>` shows the destinations deduplicated
+with counts (denied first); `--log` prints the record in order; `--json` is for
+scripts. The log holds names only, never payloads or bodies; it is kept for
+14 days after the box is deleted and removed by `corral gc`. Direct
+connections that bypass the proxy never reach the broker — they are rejected
+by the in-guest nftables rule and are therefore not in this log; that gap is
+the funnel's, not the record's (see the hardening tiers in ARCHITECTURE.md).
+
+
 ## Reporting
 
 Security issues: report privately via GitHub — **Security → Report a

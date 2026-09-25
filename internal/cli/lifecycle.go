@@ -311,11 +311,22 @@ func idleStopString(d time.Duration) string {
 func newGCCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:     "gc",
-		Short:   "Stop boxes idle longer than their idle_stop (also runs on launch and in the dashboard; `list` never stops anything)",
+		Short:   "Stop boxes idle longer than their idle_stop (the sweep also runs on launch and in the dashboard; `list` never stops anything) and remove egress logs of boxes deleted more than 14 days ago",
 		GroupID: "box",
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			idleSweep(cmd.Context(), "")
+			// Egress logs outlive their box on purpose ("what did that
+			// run reach?" is asked after the fact); gc is where they expire.
+			existing := map[string]bool{}
+			if metas, err := box.AllMeta(); err == nil {
+				for _, m := range metas {
+					existing[m.Name] = true
+				}
+			}
+			for _, name := range box.PruneEgressLogs(existing, box.EgressLogRetention) {
+				ui.Step(os.Stdout, "removed egress log of deleted box %s", name)
+			}
 			return nil
 		},
 	}

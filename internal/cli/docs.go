@@ -129,8 +129,9 @@ var controlDocs = []catalogItem{
 	{"corral-hide", "Empty box-owned file/tmpfs over each `hide` path."},
 	{"corral-boxdirs", "Box-disk directory bind-mounted over each `box_dirs` path."},
 	{"provision failure record", "A repository provision script that exits non-zero is recorded in `/corral/runtime/provision/`; corral refuses to start after create/start."},
-	{"egress broker (host)", "Per-box CONNECT/forward proxy on `127.0.0.1:<port>`, allow-list decided on the Mac, denials audited by name (`corral egress`)."},
+	{"egress broker (host)", "Per-box CONNECT/forward proxy on `127.0.0.1:<port>`, allow-list decided on the Mac; every attempted destination — allowed or denied — and every `api_brokers` call is recorded by name in the box's egress log (`corral egress`)."},
 	{"audit log", "`~/.corral/logs/sessions.jsonl`: launches, variable *names*, denials, snapshots, deletes (`corral audit`)."},
+	{"egress log", "`~/.corral/logs/egress-<box>.jsonl`: one line per connection the box attempted through its broker (host:port, allowed/denied), per `api_brokers` call (method, path, status) and per session start/end; kept 14 days after the box is deleted, rotated at 16 MiB (`corral egress --log`)."},
 }
 
 var toolchainDocs = map[string]string{
@@ -163,6 +164,7 @@ var layoutDocs = []catalogItem{
 	{"~/.corral/agents/<agent>/", "Shared agent login/state."},
 	{"~/.corral/snapshots/<box>/", "APFS-clone snapshots."},
 	{"~/.corral/ssh/config", "One `Include` per box for `corral code` / `ssh lima-<box>`."},
+	{"~/.corral/logs/", "`sessions.jsonl` (audit), `egress-<box>.jsonl` (per-box egress log), `broker-<box>.log` (broker child output)."},
 }
 
 func buildCatalog(root *cobra.Command) catalog {

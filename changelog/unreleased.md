@@ -4,6 +4,7 @@
 
 ### Added
 
+- **Per-box egress log** (#15). Every box with a broker (`network = "broker"`, or `api_brokers`) now gets `~/.corral/logs/egress-<box>.jsonl`: one line per connection the box **attempted** through the broker — `host:port` and `allowed`/`denied` — plus every `api_brokers` call (route, method, path, upstream status) and a `session start`/`end` marker with the session id and exit code, so one run's traffic can be sliced out of a long-lived box. Until now the broker only counted allowed connections and audited denials, so "a box ran untrusted dependency code — what did it try to reach?" had no answer. Names only, never payloads. `corral egress <box>` gains a **Destinations attempted** section (deduplicated, denied first, with counts and last-seen), plus `--log` (the record in order, `<time> <box> <host:port> allowed|denied`), `--since 2h` and `--json`. The log is rotated at 16 MiB (one generation kept) and outlives the box on purpose; `corral gc` removes a deleted box's log after 14 days. The audit log (`sessions.jsonl`) is unchanged. No template change.
 - Contributor workflow: issue forms with status labels, a pull request template, a Code of Conduct, Dependabot, and an issue-first process documented in CONTRIBUTING.md. `main` is protected: every change lands via pull request with all CI checks green, so a work item is never closed by a broken build.
 
 ### Changed
@@ -13,14 +14,11 @@
 ### Fixed
 
 - Box metadata is now written atomically (temp file + rename) (#18). Several processes read and write it at once — the launcher, the broker child it has just spawned, a second session, the idle sweep — and the old truncate-then-write left a window in which a reader saw an empty file. The visible symptom was a first `corral up`/`run` on a `network = "broker"` box occasionally failing with `egress broker … did not come up` (the child had logged `unknown box`) while the box itself was fine; the next command worked.
-
 - **`corral upgrade` now runs `brew update` first** (#19). Homebrew auto-updates at most once a day, so a user whose Homebrew had refreshed in the last 24 h was told *"corral X already installed"* while the tap already carried a newer formula. `corral upgrade` is meant to be the one command, and now it is.
-
 - Dashboard: while a start/stop/delete runs, the busy line now shows the elapsed time and `l` opens the log pane in follow mode so the whole operation can be trailed; previously every key was blocked and nothing moved until the state change landed.
 - The test suite no longer writes a stray box metadata stub (`boxes/x.json`) into the developer's real `~/.corral` — `TestSessionBeforeMetadataIsAdopted` now runs under a temp `CORRAL_HOME`.
 
 ### Security
 
 - **`network = "broker"` / `"offline"` no longer leave guest root reachable through the `docker` group** (#16). The lockdown removed `sudo` but not the `docker` group, and `toolchains = ["docker"]` is a key a repository may set, so a repo-owned `.corral.toml` got guest root back (the daemon runs a container with `/` mounted). A new `corral-drop-privileges` step now removes the box user from `sudo`, `admin`, `docker`, `lxd`, `incus-admin` and `disk`, makes `/run/docker.sock` root-only (a process that kept a stale docker gid cannot reach it either) and fails closed if any member remains. It runs **before the project's `provision` scripts**: those were already user-only in these modes, but still ran with the box user's NOPASSWD `sudo`, so a repository script could pre-empt the lockdown the same way. The broker/offline units call it again before every session. `doctor <box>` / `run --preflight` gain a `control privileges` check; the launcher warns that docker is root-only in these modes. The VM/Mac boundary was never affected. `toolchains` stays project-ok — the group, not the install, is the problem.
-
 - **No unattended package installer inside a box** (#17). Ubuntu's `apt-daily` and `apt-daily-upgrade` timers were enabled in every box: they fire on a schedule and try to download and install `.deb`s. Under `network = "broker"` the broker refused them, burying the denials that matter in `corral egress`; under `network = "full"` they could change a box's toolchain under a running agent. `base.sh` now masks both timers and their services and turns the `APT::Periodic` knobs off before its own `apt-get` runs; `apt-get` in toolchains and `packages` is unaffected. **Template change:** every box shows drifted — `corral rebuild`.

@@ -307,6 +307,23 @@ type Rosetta struct {
 // hostArch is runtime.GOARCH, a variable so tests can exercise the guard.
 var hostArch = runtime.GOARCH
 
+// hostOS is runtime.GOOS, a variable so tests can render either host's template.
+var hostOS = runtime.GOOS
+
+// vmDriver is the Lima vmType and mountType for this host: Apple
+// Virtualization with virtiofs on macOS, QEMU/KVM elsewhere. SPIKE (#74): on
+// Linux the mount type comes from CORRAL_SPIKE_MOUNT (9p unless "virtiofs",
+// which needs virtiofsd on the host).
+func vmDriver() (vmType, mountType string) {
+	if hostOS == "darwin" {
+		return "vz", "virtiofs"
+	}
+	if os.Getenv("CORRAL_SPIKE_MOUNT") == "virtiofs" {
+		return "qemu", "virtiofs"
+	}
+	return "qemu", "9p"
+}
+
 type Provision struct {
 	Mode   string `yaml:"mode"`
 	Script string `yaml:"script"`
@@ -381,11 +398,12 @@ func (b *Box) render(golden bool) (*Template, error) {
 	if err := checkAgents(cfg); err != nil {
 		return nil, err
 	}
+	vmType, mountType := vmDriver()
 	t := &Template{
 		MinimumLimaVersion: lima.MinVersion,
 		Base:               []string{GuestImage},
-		VMType:             "vz",
-		MountType:          "virtiofs",
+		VMType:             vmType,
+		MountType:          mountType,
 		CPUs:               cfg.CPUs,
 		Memory:             cfg.Memory, // for a golden: defaults, see below
 		Disk:               cfg.Disk,

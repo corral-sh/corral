@@ -48,7 +48,9 @@ func hostChecks(ctx context.Context) []check {
 	var out []check
 
 	// OS
-	if runtime.GOOS != "darwin" {
+	if runtime.GOOS == "linux" { // SPIKE (#74): Lima + QEMU/KVM
+		out = append(out, check{"Linux host (spike)", true, "qemu/kvm", ""})
+	} else if runtime.GOOS != "darwin" {
 		out = append(out, check{"macOS", false, runtime.GOOS, "Corral v0.x supports macOS only (Windows/Linux are on the roadmap)"})
 	} else {
 		ver := macOSVersion()

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/corral-sh/corral/internal/agent"
+	_ "github.com/corral-sh/corral/internal/agent/antigravity"
 	_ "github.com/corral-sh/corral/internal/agent/claude"
 	_ "github.com/corral-sh/corral/internal/agent/codex"
 	"github.com/corral-sh/corral/internal/broker"

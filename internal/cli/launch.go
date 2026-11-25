@@ -58,12 +58,21 @@ func addCreateFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&gf.noCreate, "no-create", false, "refuse to create a box: fail if this project has none yet")
 }
 
+// agentAliases are the extra command names an agent declares (agent.Aliaser).
+func agentAliases(a agent.Agent) []string {
+	if al, ok := a.(agent.Aliaser); ok {
+		return al.Aliases()
+	}
+	return nil
+}
+
 func newAgentCmd(a agent.Agent) *cobra.Command {
 	lf := &launchFlags{}
 	cmd := &cobra.Command{
 		Use:     a.Name() + " [-- agent args...]",
 		Short:   "Launch " + a.Summary(),
 		GroupID: "agents",
+		Aliases: agentAliases(a),
 		Long: fmt.Sprintf(`Launch %s inside the box for the current project.
 
 The first run in a project creates the box (downloads a digest-pinned Ubuntu
@@ -91,9 +100,21 @@ Authentication: %s`, a.Name(), a.Name(), a.Name(), a.LoginHint()),
 // agentPassthroughArgs returns everything after the agent sub-command that is
 // not one of our own flags. A literal "--" ends our flag parsing explicitly.
 func agentPassthroughArgs(cmd *cobra.Command, argv []string) []string {
+	// CalledAs is the name the user typed: an alias (`corral agy`) is not
+	// cmd.Name(), and matching only the name dropped every agent argument.
+	called := cmd.CalledAs()
+	if called == "" {
+		called = cmd.Name()
+	}
+	return passthroughAfter(cmd, argv, called)
+}
+
+// passthroughAfter returns the agent's arguments: what follows the command
+// word called in argv, minus Corral's own flags.
+func passthroughAfter(cmd *cobra.Command, argv []string, called string) []string {
 	idx := -1
 	for i, a := range argv {
-		if a == cmd.Name() {
+		if a == called {
 			idx = i
 			break
 		}

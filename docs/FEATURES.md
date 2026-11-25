@@ -16,6 +16,7 @@ repositories are not there. A repository's own config can shape the guest but ne
 | `corral agents` | Insight & setup | List supported agents and manage their persistent state |
 | `corral agents import <agent>` |  | Copy host settings/skills (never credentials) into the agent's box state |
 | `corral agents logout <agent>` |  | Remove the stored login for an agent from ~/.corral/agents |
+| `corral antigravity [-- agent args...]` | Agents | Launch Antigravity CLI (Google, `agy`) — vendor installer, sha512-verified against Google's release manifest (also `corral agy`) |
 | `corral audit` | Insight & setup | Show the session audit log (who launched what, where, with which env) |
 | `corral claude [-- agent args...]` | Agents | Launch Claude Code (Anthropic) — installed from the official installer |
 | `corral code` | Agents | Open the project inside the box in VS Code (or Cursor / JetBrains) over SSH |
@@ -23,7 +24,7 @@ repositories are not there. A repository's own config can shape the guest but ne
 | `corral config` | Insight & setup | Show the resolved configuration for the current project |
 | `corral config init` |  | Write a commented .corral.toml into the project (--host: your per-project file instead) |
 | `corral config path` |  | Print the global config file path |
-| `corral delete [box]` | Box lifecycle | Delete a box (VM disk); the project and agent login are kept |
+| `corral delete [box]` | Box lifecycle | Delete a box (VM disk); the project and agent login are kept (also `corral rm`) |
 | `corral docs` | Insight & setup | Print the feature catalog (every command, config key, mode, control) — for humans and AI assistants |
 | `corral doctor [box]` | Insight & setup | Check the host; with a box name, preflight what the project declared from inside the box |
 | `corral egress [box]` | Insight & setup | Show a box's network mode, allowed destinations, what it reached and what was refused |
@@ -32,7 +33,7 @@ repositories are not there. A repository's own config can shape the guest but ne
 | `corral golden build` |  | Build (or verify) the golden image for this project's configuration |
 | `corral golden prune` |  | Delete golden images no existing box was cloned from (also runs after upgrade and golden build) |
 | `corral info [box]` | Insight & setup | Show details of a box: mounts, resources, agents, forwarded env |
-| `corral list` | Insight & setup | List boxes and their state (read-only; --json adds live guest metrics for running boxes) |
+| `corral list` | Insight & setup | List boxes and their state (read-only; --json adds live guest metrics for running boxes) (also `corral ls`, `corral status`, `corral ps`) |
 | `corral logs [box]` | Insight & setup | Show the box's boot/provisioning log (Lima hostagent + serial console) |
 | `corral rebuild [box]` | Box lifecycle | Delete and re-create a box with the current configuration |
 | `corral restart [box]` | Box lifecycle | Stop and start a box |

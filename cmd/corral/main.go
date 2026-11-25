@@ -7,6 +7,7 @@ import (
 	"github.com/corral-sh/corral/internal/cli"
 
 	// Registered agents. Add new agents here — nothing else needs to change.
+	_ "github.com/corral-sh/corral/internal/agent/antigravity"
 	_ "github.com/corral-sh/corral/internal/agent/claude"
 	_ "github.com/corral-sh/corral/internal/agent/codex"
 )

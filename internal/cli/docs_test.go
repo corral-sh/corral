@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	_ "github.com/corral-sh/corral/internal/agent/antigravity"
 	_ "github.com/corral-sh/corral/internal/agent/claude" // the catalog lists agent commands; main.go does this import
 	_ "github.com/corral-sh/corral/internal/agent/codex"
 	"github.com/corral-sh/corral/internal/config"

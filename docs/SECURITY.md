@@ -162,7 +162,8 @@ each. They are the items to weigh before running an untrusted repository.
 | Node.js | nodejs.org/dist | `SHASUMS256.txt` checked before extraction |
 | Go | go.dev/dl | sha256 from go.dev metadata checked |
 | Docker | Ubuntu `docker.io` package | apt signature |
-| Claude Code | `https://claude.ai/install.sh` (Anthropic) | vendor's installer; the only `curl \| bash` in the box |
+| Claude Code | `https://claude.ai/install.sh` (Anthropic) | vendor's installer. Vendors' own installers (this one and Antigravity's) are the only `curl \| bash` the guest scripts allow |
+| Antigravity CLI (when `agents` names it) | `https://antigravity.google/cli/install.sh` (Google) | vendor's installer, downloaded to a file and run; it checks the sha512 listed in Google's release manifest (same origin as the download). Self-update is disabled in the box |
 | Codex CLI (when `agents` names it) | release binary from `github.com/openai/codex` | sha256 digest GitHub records for the release asset, checked before extraction (same origin as the download: catches a corrupt or swapped CDN object, not a compromised release) |
 | Lima | homebrew-core's `lima` formula, built from the upstream tarball (sha256 in the formula) | Lima pins the guest OS image by digest per release; `doctor` reports a Lima release other than the tested one |
 | corral | this repository, built locally by `install.sh` / the Homebrew formula from the git tag | you can read it; release binaries on the GitHub release come with `SHA256SUMS` **signed by minisign** (`SHA256SUMS.minisig`; public key `release/minisign.pub`, secret key only in a GitHub Actions secret) — `minisign -Vm SHA256SUMS -p minisign.pub && shasum -a 256 -c SHA256SUMS` |

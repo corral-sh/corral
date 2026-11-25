@@ -286,3 +286,18 @@ func TestAgentStateTightenOrder(t *testing.T) {
 		t.Fatal("isolated (via alias) → seeded is a loosening and must be refused")
 	}
 }
+
+// An agent's host state holds its login: mounting it (or a parent of it) is
+// refused like ~/.ssh. The CLI state of every registered agent is covered.
+func TestExtraMountRefusesAgentLogins(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip(err)
+	}
+	for _, p := range []string{".claude", ".codex", ".gemini", ".config/antigravity", ".config"} {
+		err := ExtraMount(config.Mount{Host: filepath.Join(home, p), Guest: "/x"})
+		if err == nil || !strings.Contains(err.Error(), "would expose") {
+			t.Errorf("mount ~/%s: %v", p, err)
+		}
+	}
+}

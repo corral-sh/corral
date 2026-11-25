@@ -8,6 +8,7 @@ versioning: [SemVer](https://semver.org). Unreleased work accumulates in
 | Version | Date | Highlights |
 |---|---|---|
 | [Unreleased](changelog/unreleased.md) | — | — |
+| [0.10.1](changelog/0.10.1.md) | 2026-11-25 | New website and brand: the fence-ring mark, `✦` in the terminal and inside the box, ember accent. **Boxes show config changed until rebuilt** (login message and prompt) |
 | [0.10.0](changelog/0.10.0.md) | 2026-11-25 | **Antigravity CLI** (Google) as a third agent: `corral agy`, shared sign-in, measured broker hosts; agent command aliases; aliased agent commands keep their arguments |
 | [0.9.2](changelog/0.9.2.md) | 2026-11-25 | Tested with Lima 2.3.0 (`corral upgrade` pulls it in); `doctor` suggests a fix that works for an untested Lima; valid TOML in the README's `api_brokers` example |
 | [0.9.1](changelog/0.9.1.md) | 2026-11-25 | Broker boxes no longer burn a full CPU core on `systemd-resolved`; DNS lookups in a broker box fail at once instead of timing out. **Rebuild broker boxes** |

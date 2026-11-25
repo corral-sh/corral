@@ -81,6 +81,19 @@ done
 nft delete table inet corral_broker 2>/dev/null || true
 nft -f /etc/corral/broker.nft
 
+# DNS is closed here by design, and systemd-resolved does not cope: every
+# blocked query leaves an error on one of its sockets that it never drains, so
+# it spins in epoll at ~100% of a vCPU for as long as the box runs. Stop it and
+# mask it for this boot only (--runtime lives in /run): the next boot's
+# provisioning still resolves names before this unit locks down again, and the
+# mask also refuses D-Bus activation. /etc/resolv.conf keeps pointing at the
+# 127.0.0.53 stub, which now refuses at once, so a lookup fails fast instead of
+# timing out. The box's own hostname, which resolved used to answer, goes into
+# /etc/hosts (tools such as Java's getLocalHost need it).
+systemctl mask --runtime --now systemd-resolved.service >/dev/null 2>&1 || true
+host=$(hostname)
+grep -qE "[[:space:]]${host}([[:space:]]|\$)" /etc/hosts || printf '127.0.1.1\t%s\n' "$host" >>/etc/hosts
+
 # Remove the blanket sudo grant and the root-equivalent groups (docker);
 # keep the scoped corral-* restart entries. Installed by drop-privileges.sh.
 /opt/corral/bin/corral-drop-privileges

@@ -1,0 +1,45 @@
+<!doctype html>
+<!-- Source of the site's raster images; rendered by tools/brand/render.sh.
+     ?icon=<px> renders the square app icon at that size; otherwise the
+     1200×630 social card (og:image). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@500&family=Space+Grotesk:wght@700&display=swap">
+<style>
+html,body{margin:0;width:100%;height:100%;background:#0A0D12;color:#EEF1F5;overflow:hidden}
+.card{position:relative;width:1200px;height:630px;box-sizing:border-box;padding:84px 96px;display:flex;flex-direction:column;justify-content:space-between;font-family:Inter,sans-serif}
+.card::after{content:"";position:absolute;right:-160px;top:-120px;width:620px;height:620px;border-radius:50%;background:radial-gradient(closest-side,rgba(255,178,36,.16),rgba(255,178,36,0))}
+.brand{display:flex;align-items:center;gap:22px;font:700 54px 'Space Grotesk',sans-serif;letter-spacing:-.02em}
+h1{margin:0;font:700 76px/1.04 'Space Grotesk',sans-serif;letter-spacing:-.035em}
+h1 em{font-style:normal;color:#FFB224}
+.foot{display:flex;justify-content:space-between;align-items:flex-end;font-size:26px;color:#9AA4B2}
+.foot b{color:#EEF1F5;font-weight:500}
+.icon{display:flex;align-items:center;justify-content:center;background:#0A0D12}
+.icon svg{width:72%;height:72%}
+</style>
+</head>
+<body>
+<div id="card" class="card">
+  <div class="brand">
+    <svg width="84" height="84" viewBox="0 0 56 56"><g fill="none" stroke="#EEF1F5" stroke-width="3.4" stroke-linecap="round"><path d="M44.85 13.86A22 22 0 1 0 44.85 42.14"/><path d="M38.72 19A14 14 0 1 0 38.72 37"/><path d="M28 17V3M18.47 22.5L6.35 15.5M18.47 33.5L6.35 40.5M28 39V53M36.43 20.93L47.15 11.93M36.43 35.07L47.15 44.07"/></g><path d="M28 20.5Q29.2 26.8 35.5 28Q29.2 29.2 28 35.5Q26.8 29.2 20.5 28Q26.8 26.8 28 20.5Z" fill="#FFB224"/></svg>
+    corral
+  </div>
+  <h1>Your agent, unleashed.<br><em>Your Mac, untouched.</em></h1>
+  <div class="foot"><span>A sandbox for AI coding agents · one VM per project</span><b>open source · macOS</b></div>
+</div>
+<div id="icon" class="icon" hidden style="display:none">
+  <svg viewBox="0 0 56 56"><g fill="none" stroke="#EEF1F5" stroke-width="3.6" stroke-linecap="round"><path d="M44.85 13.86A22 22 0 1 0 44.85 42.14"/><path d="M38.72 19A14 14 0 1 0 38.72 37"/><path d="M28 17V3M18.47 22.5L6.35 15.5M18.47 33.5L6.35 40.5M28 39V53M36.43 20.93L47.15 11.93M36.43 35.07L47.15 44.07"/></g><path d="M28 20.5Q29.2 26.8 35.5 28Q29.2 29.2 28 35.5Q26.8 29.2 20.5 28Q26.8 26.8 28 20.5Z" fill="#FFB224"/></svg>
+</div>
+<script>
+var m = location.search.match(/icon=(\d+)/);
+if (m) {
+  var icon = document.getElementById('icon');
+  document.getElementById('card').style.display = 'none'; // .card's display:flex beats [hidden]
+  icon.hidden = false;
+  icon.style.display = 'flex';
+  icon.style.width = icon.style.height = m[1] + 'px';
+}
+</script>
+</body>
+</html>

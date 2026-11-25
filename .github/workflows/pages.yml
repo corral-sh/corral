@@ -1,5 +1,6 @@
-# Project site (tools/site) → GitHub Pages. All links in the generated pages
-# are relative, so the /corral/ base path of a project site works as-is.
+# Project site → GitHub Pages: the hand-authored static files in site/ are
+# published as they are (no build step). Links are relative, so the /corral/
+# base path of a project site works; 404.html uses absolute /corral/ paths.
 name: pages
 
 on:
@@ -21,15 +22,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0 # git describe needs tags for the version string
-      - uses: actions/setup-go@v7
-        with:
-          go-version-file: go.mod
-      - run: make site
       - uses: actions/upload-pages-artifact@v5
         with:
-          path: public
+          path: site
 
   deploy:
     needs: build

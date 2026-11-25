@@ -1,4 +1,15 @@
-# 🐎 Corral
+<p align="center">
+  <a href="https://corral-sh.github.io/corral/">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/assets/mark-dark.svg">
+      <img src="docs/assets/mark-light.svg" alt="Corral logo: a post-and-rail fence ring with a spark inside" width="88" height="88">
+    </picture>
+  </a>
+</p>
+
+# Corral
+
+**Website: [corral-sh.github.io/corral](https://corral-sh.github.io/corral/)**
 
 **Your agent, unleashed. Your Mac, untouched.**
 

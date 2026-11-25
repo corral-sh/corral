@@ -33,6 +33,7 @@ experiments — tests already do (`t.Setenv`).
 - `internal/guest/scripts/*.sh` — embedded scripts run inside the VM. `base.sh` (root), `toolchain-*.sh` (root), `user-base.sh` (user). Keep them idempotent; they run once via cloud-init and again on `rebuild`.
 - `internal/config` — TOML schema. Pointer fields = "unset"; lists are unioned across layers. Layers: defaults < global < project (restricted) < `~/.corral/projects/<box>.toml` (trusted) < flags.
 - `internal/policy` — the only place that decides what config is acted on: trust class per key (`trust.go`), path confinement and refused mounts (`paths.go`), `policy.Load`. New rules go here, not in `box` or `cli`.
+- `site/` — the website (GitHub Pages, `pages.yml` publishes it as is): one hand-authored landing page, no build step. Keep it short; reference material belongs in the README/docs. Brand: the fence-ring mark (`site/assets/mark.svg`, README `docs/assets/mark-*.svg`) and `✦` (`ui.Logo`) in the terminal. Raster images (social card, icons) come from `tools/brand/render.sh` (headless Chrome); re-run it after changing the mark.
 - `docs/` — `FEASIBILITY.md` (why Lima, measurements), `ARCHITECTURE.md`, `SECURITY.md`, `FEATURES.md` (**generated**: `make docs` after any command/config change — `TestFeaturesCatalogUpToDate` fails otherwise; one-line descriptions live in `internal/cli/docs.go`). `llms.txt` at the root points AI assistants at these.
 
 ## Conventions

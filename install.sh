@@ -22,7 +22,7 @@ SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SRC_DIR"
 [ -f go.mod ] && grep -q 'corral' go.mod || die "run this from the corral checkout"
 
-say "🐎 ${BOLD}Corral installer${NC} ${DIM}($SRC_DIR)${NC}"
+say "✦ ${BOLD}Corral installer${NC} ${DIM}($SRC_DIR)${NC}"
 
 # 1. Platform ---------------------------------------------------------------
 [ "$(uname -s)" = "Darwin" ] || die "Corral v0.x supports macOS only (Windows/Linux are on the roadmap)"

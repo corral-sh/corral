@@ -11,7 +11,7 @@ class Corral < Formula
   homepage "https://github.com/corral-sh/corral"
   url "https://github.com/corral-sh/corral.git",
       using: :git,
-      tag:   "v0.8.1"
+      tag:   "v0.9.0"
   license "Apache-2.0"
   head "https://github.com/corral-sh/corral.git", using: :git, branch: "main"
 

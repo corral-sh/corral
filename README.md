@@ -368,8 +368,12 @@ allow    = [
 ]
 
 [[api_brokers]]
-name = "jira"   upstream = "https://x.atlassian.net"   token = "JIRA_TOKEN"
-auth = "basic"  user = "me@example.com"                allow = ["GET /rest/api/3/issue/*"]
+name     = "jira"
+upstream = "https://x.atlassian.net"
+token    = "JIRA_TOKEN"
+auth     = "basic"
+user     = "me@example.com"
+allow    = ["GET /rest/api/3/issue/*"]
 ```
 
 Inside the box the route is `$CORRAL_API_GITLAB` (`http://192.168.5.2:<port>/gitlab`):

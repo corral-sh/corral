@@ -93,7 +93,7 @@ make it stricter · **trusted-only** — refused in the repository file (it woul
 | `timeout` | string |  | trusted-only | Default for `run --timeout`: end the session after this long (SIGTERM, then SIGKILL after 10 s), exit 124. |
 | `packages` | []string |  | project-ok | Extra Ubuntu apt packages installed in the box. |
 | `toolchains` | []string | `[node]` | project-ok | Preinstalled toolchains (see Toolchains below); they define the golden image. Unioned across layers; an explicit `[]` drops the default node. |
-| `toolchain_versions` | map[string]string |  | project-ok | `{ flutter = "3.44.2" }` or `"3.44.2@<commit>"`: pin a toolchain's release (flutter today); part of the golden image's identity, verified against the commit when given. |
+| `toolchain_versions` | map[string]string |  | project-ok | `{ node = "22.23.2", go = "1.25.14", flutter = "3.44.2" }` (flutter also `"3.44.2@<commit>"`): pin a toolchain's release instead of the newest one; part of the golden image's identity, verified against the commit when given. |
 | `mounts` | []string |  | trusted-only | Extra host directories mounted into the box (`host:guest[:ro]`); home and credential directories are refused. |
 | `provision` | []string |  | project-ok | Repository scripts run at the end of provisioning as the box user (`# corral: system` for root in full mode); a failure fails the start. |
 | `hide` | []string |  | project-ok | Project paths shown empty inside the box (`.env`, `secrets/`). |
@@ -132,16 +132,16 @@ What enforces the configuration inside the box (systemd units, re-applied before
 
 ## Toolchains
 
-`toolchains = [...]`; every download is pinned and checksum-verified, no `curl | bash` except the agent vendor's own installer.
+`toolchains = [...]`; every download is checksum-verified (node, go and flutter pinnable with `toolchain_versions`), no `curl | bash` except the agent vendor's own installer.
 
 | | |
 |---|---|
 | `android` | Android SDK cmdline-tools (SHA-256 pinned), platform-tools, android-35, build-tools 35.0.0, JDK; amd64 multiarch so aapt2 runs under Rosetta. |
 | `docker` | Docker Engine + compose + buildx inside the box; the box user is in the docker group — except under `network = "broker"`/`"offline"`, where that group is root-equivalent and is removed. |
 | `flutter` | Flutter stable (3.47.1 by default; `toolchain_versions` pins another release), release commit pinned and verified, Dart + Android artifacts precached. |
-| `go` | Latest stable Go from go.dev (SHA-256 verified). |
+| `go` | Go from go.dev, SHA-256 verified: the newest stable release unless `toolchain_versions` pins one. |
 | `java` | OpenJDK 17, JAVA_HOME. |
-| `node` | Node.js 22 LTS from nodejs.org (SHA-256 verified), npm `min-release-age = 7`. |
+| `node` | Node.js 22 LTS from nodejs.org, SHA-256 verified: the newest v22 release unless `toolchain_versions` pins one; npm `min-release-age = 7`. |
 | `python` | Python 3, pip, venv, pipx (Ubuntu apt). |
 
 ## Environment inside the box

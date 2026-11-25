@@ -57,7 +57,7 @@ var keyDocs = map[string]string{ //nolint:gosec // G101: documentation strings m
 	"timeout":              "Default for `run --timeout`: end the session after this long (SIGTERM, then SIGKILL after 10 s), exit 124.",
 	"env_file":             "`KEY=value` file consulted after the exported environment and before the Keychain — the credential path for an unattended host (launchd). Must be 0600, yours, under your home; refused otherwise.",
 	"packages":             "Extra Ubuntu apt packages installed in the box.",
-	"toolchain_versions":   "`{ flutter = \"3.44.2\" }` or `\"3.44.2@<commit>\"`: pin a toolchain's release (flutter today); part of the golden image's identity, verified against the commit when given.",
+	"toolchain_versions":   "`{ node = \"22.23.2\", go = \"1.25.14\", flutter = \"3.44.2\" }` (flutter also `\"3.44.2@<commit>\"`): pin a toolchain's release instead of the newest one; part of the golden image's identity, verified against the commit when given.",
 	"toolchains":           "Preinstalled toolchains (see Toolchains below); they define the golden image. Unioned across layers; an explicit `[]` drops the default node.",
 	"mounts":               "Extra host directories mounted into the box (`host:guest[:ro]`); home and credential directories are refused.",
 	"provision":            "Repository scripts run at the end of provisioning as the box user (`# corral: system` for root in full mode); a failure fails the start.",
@@ -135,8 +135,8 @@ var controlDocs = []catalogItem{
 }
 
 var toolchainDocs = map[string]string{
-	"node":    "Node.js 22 LTS from nodejs.org (SHA-256 verified), npm `min-release-age = 7`.",
-	"go":      "Latest stable Go from go.dev (SHA-256 verified).",
+	"node":    "Node.js 22 LTS from nodejs.org, SHA-256 verified: the newest v22 release unless `toolchain_versions` pins one; npm `min-release-age = 7`.",
+	"go":      "Go from go.dev, SHA-256 verified: the newest stable release unless `toolchain_versions` pins one.",
 	"python":  "Python 3, pip, venv, pipx (Ubuntu apt).",
 	"docker":  "Docker Engine + compose + buildx inside the box; the box user is in the docker group — except under `network = \"broker\"`/`\"offline\"`, where that group is root-equivalent and is removed.",
 	"java":    "OpenJDK 17, JAVA_HOME.",
@@ -273,7 +273,7 @@ func renderCatalogMarkdown(w io.Writer, c catalog) {
 	}
 	section("Modes", "", c.Modes)
 	section("Guest controls", "What enforces the configuration inside the box (systemd units, re-applied before every session) and on the Mac.", c.Controls)
-	section("Toolchains", "`toolchains = [...]`; every download is pinned and checksum-verified, no `curl | bash` except the agent vendor's own installer.", c.Toolchain)
+	section("Toolchains", "`toolchains = [...]`; every download is checksum-verified (node, go and flutter pinnable with `toolchain_versions`), no `curl | bash` except the agent vendor's own installer.", c.Toolchain)
 	section("Environment inside the box", "", c.GuestEnv)
 	section("Host layout", "", c.Layout)
 	section("Exit codes and outcomes", "`corral run` for queues and scripts: the agent's status passes through; Corral's own outcomes use sysexits(3) codes agents do not.", c.ExitCodes)

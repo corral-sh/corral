@@ -79,7 +79,7 @@ flowchart LR
 | **Untrusted repositories** | A repo's `.corral.toml` can shape the guest, never widen host access; `source = "clone"` mounts nothing at all. [→](#source-modes--how-the-code-reaches-the-box) |
 | **Speed** | Golden images: the second project is ready in ~15 s; `box_dirs` keeps `node_modules` on the box disk (29× faster installs); 1.4 s overhead per invocation. |
 | **Your login, your rules** | `agent_state = shared \| seeded \| isolated`; tokens from the environment or the macOS Keychain (`keychain_env`), forwarded over SSH, never on a command line. [→](#agent-state--where-the-login-lives) |
-| **Toolchains** | node · go · python · docker · java · android (aapt2 under Rosetta) · flutter — pinned and checksum-verified. [→](#toolchains) |
+| **Toolchains** | node · go · python · docker · java · android (aapt2 under Rosetta) · flutter — checksum-verified; node, go and flutter can be pinned to a release. [→](#toolchains) |
 | **Undo** | APFS-clone snapshots at every session start; `corral undo`. [→](#snapshots-and-undo) |
 | **Visibility** | Dashboard with guest *and host* memory, a log pane (`l`), drift detection, `doctor <box>` preflight, names-only audit log; `list --json` is read-only and carries live metrics. |
 | **Unattended** | A Mac mini running a queue: `env_file` credentials without a login session, admission control (`max_running`, `memory_reserve`), `run --timeout`, distinguishable exit codes (78/75/69/124) and `--result` JSON, `api_brokers` so tokens never enter the box. [→](#unattended-host--a-mac-mini-running-a-queue) |
@@ -447,8 +447,8 @@ Changing anything that shapes the VM marks the box as *drifted* until you
 
 | Name | Installs | From |
 |---|---|---|
-| `node` (default) | Node.js 22 LTS, npm with `min-release-age = 7` | nodejs.org tarball, SHA256 verified |
-| `go` | latest stable Go | go.dev tarball, SHA256 verified |
+| `node` (default) | Node.js 22 LTS — the newest v22 release, or the one in `toolchain_versions` — npm with `min-release-age = 7` | nodejs.org tarball, SHA256 verified against that release's `SHASUMS256.txt` |
+| `go` | the newest stable Go, or the release in `toolchain_versions` | go.dev tarball, SHA256 verified against go.dev/dl metadata |
 | `python` | Python 3, pip, venv, pipx | Ubuntu apt |
 | `docker` | Docker Engine + compose + buildx **inside the box** | Ubuntu apt |
 | `java` | OpenJDK 17, `JAVA_HOME` | Ubuntu apt |
@@ -458,6 +458,17 @@ Changing anything that shapes the VM marks the box as *drifted* until you
 `toolchains` is unioned across layers, except that an explicit `toolchains = []` means **none** — a
 project that does not want Node.js does not get it; an omitted key keeps the default `["node"]`.
 
+Unpinned, `node` and `go` install whatever release is newest **on the day the box or its golden image is
+built** — the checksum comes from the same place that chose the version, so it catches a corrupt download but
+pins nothing, and two goldens built weeks apart hold different versions. The provisioning log prints the
+release it resolved, ready to paste into a pin. Pin them when you need reproducible boxes or a minimum release
+age:
+
+```toml
+toolchains         = ["node", "go"]
+toolchain_versions = { node = "22.23.2", go = "1.25.14" }        # exact releases; old ones work too
+```
+
 A team that pins Flutter (FVM, `.fvmrc`) pins the box the same way — in the repository's own file, since
 it only changes what the guest installs:
 
@@ -465,6 +476,11 @@ it only changes what the guest installs:
 toolchains         = ["flutter", "android", "java"]
 toolchain_versions = { flutter = "3.44.2" }                      # or "3.44.2@<40-hex commit>" to verify the commit too
 ```
+
+`toolchain_versions` is merged per toolchain, later layers winning: a pin in `~/.corral/config.toml`
+is a default the repository's `.corral.toml` can override, and one in the trusted
+`~/.corral/projects/<box>.toml` overrides the repository. It is a reproducibility control, not a
+containment one — code in the box can always fetch another runtime into the user's home.
 
 Each pinned release is its own golden image (the version is part of its identity), so two projects on
 different releases never share one. Without `@commit` the tag comes over TLS from github.com and the

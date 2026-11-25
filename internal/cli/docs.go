@@ -182,7 +182,15 @@ func buildCatalog(root *cobra.Command) catalog {
 				continue
 			}
 			use := prefix + sub.Use
-			c.Commands = append(c.Commands, catalogCommand{Command: use, Group: groups[sub.GroupID], Summary: sub.Short})
+			summary := sub.Short
+			if len(sub.Aliases) > 0 {
+				names := make([]string, len(sub.Aliases))
+				for i, al := range sub.Aliases {
+					names[i] = "`" + prefix + al + "`"
+				}
+				summary += " (also " + strings.Join(names, ", ") + ")"
+			}
+			c.Commands = append(c.Commands, catalogCommand{Command: use, Group: groups[sub.GroupID], Summary: summary})
 			walk(prefix+sub.Name()+" ", sub)
 		}
 	}

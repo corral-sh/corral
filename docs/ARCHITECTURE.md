@@ -16,7 +16,7 @@ flowchart TB
             c_box["box — name · metadata ·<br/>Lima template · launch env · audit"]
             c_lima["lima — limactl + ssh -F<br/>(policy-free)"]
             c_broker["broker — allow-list proxy<br/>127.0.0.1:port"]
-            c_agent["agent — registry<br/>claude · codex"]
+            c_agent["agent — registry<br/>claude · codex · antigravity"]
             c_guest["guest — embedded scripts<br/>base · toolchains · units"]
             c_cli --> c_policy --> c_config
             c_cli --> c_box --> c_lima

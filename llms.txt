@@ -1,6 +1,6 @@
 # Corral
 
-> Run AI coding agents (Claude Code and Codex) at full speed inside a throwaway per-project Linux VM on macOS
+> Run AI coding agents (Claude Code, Codex and Antigravity CLI) at full speed inside a throwaway per-project Linux VM on macOS
 > (Lima + Apple Virtualization). The project is mounted at its real path; the Mac's home directory, SSH keys,
 > Keychain and other repositories are not there. A repository's own config can shape the guest but never
 > widen what the box reaches. Open source, Apache-2.0: https://github.com/corral-sh/corral

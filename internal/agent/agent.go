@@ -84,6 +84,12 @@ type StateSeeder interface {
 	SeedStateScript(stateDir string) string
 }
 
+// Aliaser is an optional interface for agents whose CLI command has a
+// shorter name than the agent, e.g. `corral agy` for antigravity.
+type Aliaser interface {
+	Aliases() []string
+}
+
 var registry = map[string]Agent{}
 
 // Register adds an agent. It panics on duplicate names because that is a

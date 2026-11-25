@@ -2,7 +2,7 @@
 
 **Your agent, unleashed. Your Mac, untouched.**
 
-Run AI coding agents — **Claude Code** and **Codex** — at full speed inside a persistent, per-project VM.
+Run AI coding agents — **Claude Code**, **Codex** and **Antigravity CLI** — at full speed inside a persistent, per-project VM.
 
 Corral is built on [Lima](https://lima-vm.io) and Apple's Virtualization
 framework, after a real supply-chain incident involving AI tooling. Each
@@ -15,7 +15,7 @@ the roadmap via Lima's qemu/WSL2 drivers.**
 
 ```
 cd ~/Code/my-project
-corral claude        # or: corral codex
+corral claude        # or: corral codex · corral agy
 ```
 
 That is the whole workflow. The first box on a Mac builds a **golden image**
@@ -55,7 +55,7 @@ flowchart LR
     end
     subgraph vm["Lima VM (Apple Virtualization) — one per project"]
         direction TB
-        agent["Claude Code · Codex<br/>no permission prompts"]
+        agent["Claude Code · Codex · Antigravity<br/>no permission prompts"]
         mount["/Users/you/Code/project<br/>virtiofs · same path · same uid"]
         local["box disk<br/>box_dirs · toolchains · agent state"]
         nft["nftables funnel<br/>only the broker · no DNS · no sudo"]
@@ -78,7 +78,7 @@ flowchart LR
 | **Egress control** | `network = "broker"`: only the hosts you list, decided on the Mac, DNS closed in the guest, every denial named. `offline` for review sessions. [→](#network-modes--where-the-box-may-connect) |
 | **Untrusted repositories** | A repo's `.corral.toml` can shape the guest, never widen host access; `source = "clone"` mounts nothing at all. [→](#source-modes--how-the-code-reaches-the-box) |
 | **Speed** | Golden images: the second project is ready in ~15 s; `box_dirs` keeps `node_modules` on the box disk (29× faster installs); 1.4 s overhead per invocation. |
-| **Agents** | Claude Code and Codex CLI on one agent interface; `agents` picks what a box installs, each agent's credentials reach only its own sessions. [→](#agents) |
+| **Agents** | Claude Code, Codex CLI and Antigravity CLI on one agent interface; `agents` picks what a box installs, each agent's credentials reach only its own sessions. [→](#agents) |
 | **Your login, your rules** | `agent_state = shared \| seeded \| isolated`; tokens from the environment or the macOS Keychain (`keychain_env`), forwarded over SSH, never on a command line. [→](#agent-state--where-the-login-lives) |
 | **Toolchains** | node · go · python · docker · java · android (aapt2 under Rosetta) · flutter — checksum-verified; node, go and flutter can be pinned to a release. [→](#toolchains) |
 | **Undo** | APFS-clone snapshots at every session start; `corral undo`. [→](#snapshots-and-undo) |
@@ -128,10 +128,11 @@ Then:
 corral setup       # 1 minute: prerequisites + defaults (CPUs, RAM, toolchains…)
 cd ~/Code/<project>
 corral claude      # builds the box, starts Claude Code inside it
-corral codex       # or Codex — see Agents below for enabling it
+corral codex       # or Codex, or `corral agy` for Antigravity — see Agents below
 ```
 
-Log in once inside the box — `/login` in Claude, `codex login --device-auth` for Codex; the login is
+Log in once inside the box — `/login` in Claude, `codex login --device-auth` for Codex, `agy` for
+Antigravity (it prints a URL; paste the code back); the login is
 stored in `~/.corral/agents/<agent>` and reused by every box (`agent_state = "shared"`). Or export
 the agent's API key on your Mac and it is forwarded to that agent's sessions.
 
@@ -143,24 +144,25 @@ pick it up.
 
 ## Agents
 
-| | **Claude Code** | **Codex CLI** |
-|---|---|---|
-| Launch | `corral claude` | `corral codex` |
-| Installed | by default | when `agents` (or `default_agent`) names it |
-| From | Anthropic's installer, `claude.ai/install.sh` | the release binary from `github.com/openai/codex`, verified against the sha256 digest GitHub records for it — no npm |
-| Log in once | `/login` inside Claude | `codex login --device-auth` (a code, no browser callback) or `printenv OPENAI_API_KEY \| codex login --with-api-key` |
-| Host variables forwarded (to its own sessions only) | `ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN` | `OPENAI_API_KEY`, `CODEX_API_KEY` |
-| Yolo (default) | `--dangerously-skip-permissions` | `--dangerously-bypass-approvals-and-sandbox` |
-| `--ask` | Claude's own prompts | Codex's approval prompts, with `--sandbox danger-full-access` — Codex's Linux sandbox needs user namespaces that Ubuntu 24.04's AppArmor denies in the box; the VM is the sandbox |
-| State (login, settings, history) | `~/.corral/agents/claude` (`CLAUDE_CONFIG_DIR`) | `~/.corral/agents/codex` (`CODEX_HOME`) |
-| Broker hosts it adds | `api.anthropic.com`, `*.anthropic.com`, `platform.claude.com` | `api.openai.com`, `auth.openai.com`, `chatgpt.com` |
-| `--import-config` copies | `~/.claude/{CLAUDE.md,settings.json,skills,agents,commands}` | `~/.codex/{config.toml,AGENTS.md,prompts,skills}` |
+| | **Claude Code** | **Codex CLI** | **Antigravity CLI** (Google) |
+|---|---|---|---|
+| Launch | `corral claude` | `corral codex` | `corral agy` (or `corral antigravity`) |
+| Installed | by default | when `agents` (or `default_agent`) names it | when `agents` names `antigravity` |
+| From | Anthropic's installer, `claude.ai/install.sh` | the release binary from `github.com/openai/codex`, verified against the sha256 digest GitHub records for it — no npm | Google's installer, `antigravity.google/cli/install.sh`, which checks the sha512 in Google's release manifest — no npm |
+| Log in once | `/login` inside Claude | `codex login --device-auth` (a code, no browser callback) or `printenv OPENAI_API_KEY \| codex login --with-api-key` | `agy`: open the printed URL on your Mac, sign in with Google, paste the code back |
+| Host variables forwarded (to its own sessions only) | `ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN` | `OPENAI_API_KEY`, `CODEX_API_KEY` | none — sign-in only (API-key auth is not verified yet) |
+| Yolo (default) | `--dangerously-skip-permissions` | `--dangerously-bypass-approvals-and-sandbox` | `--dangerously-skip-permissions` |
+| `--ask` | Claude's own prompts | Codex's approval prompts, with `--sandbox danger-full-access` — Codex's Linux sandbox needs user namespaces that Ubuntu 24.04's AppArmor denies in the box; the VM is the sandbox | Antigravity's own prompts; its `--sandbox` stays opt-in |
+| State (login, settings, history) | `~/.corral/agents/claude` (`CLAUDE_CONFIG_DIR`) | `~/.corral/agents/codex` (`CODEX_HOME`) | `~/.corral/agents/antigravity` — `~/.gemini` and `~/.config/antigravity` in the box are links into it (agy has no variable to relocate them) |
+| Broker hosts it adds | `api.anthropic.com`, `*.anthropic.com`, `platform.claude.com` | `api.openai.com`, `auth.openai.com`, `chatgpt.com` | `oauth2`, `www`, `daily-cloudcode-pa`, `cloudcode-pa`, `aicode`, `businessaicode` `.googleapis.com` |
+| `--import-config` copies | `~/.claude/{CLAUDE.md,settings.json,skills,agents,commands}` | `~/.codex/{config.toml,AGENTS.md,prompts,skills}` | `~/.gemini/{GEMINI.md,config/skills,config/workflows,antigravity-cli/settings.json}` |
 
 Enable Codex for every box, or for one:
 
 ```toml
 # ~/.corral/config.toml (every box) — or ~/.corral/projects/<box>.toml (one box)
 agents = ["codex"]                 # unioned with the default ["claude"]; then `corral rebuild <box>`
+# agents = ["antigravity"]         # Google's Antigravity CLI (`corral agy`)
 
 # a Codex-only box:  agents = []  +  default_agent = "codex"
 ```
@@ -170,14 +172,17 @@ agent **only the repository** enabled gets its own empty login in that box (your
 `~/.corral/agents/<agent>` is not mounted for it) and, in broker mode, none of its API hosts. The
 launcher says so and names the line for your own file. Launching an agent the box was not built with
 names the file to edit and the `rebuild` it takes. `corral agents` lists both and whether a login is
-stored. Adding Codex is a template change for that box only: a Claude-only box renders exactly as
+stored. Antigravity's self-update is turned off in the box (`AGY_CLI_DISABLE_AUTO_UPDATE=true`; a rebuild
+updates it), and in broker mode its usage logging to `play.googleapis.com` — which has no opt-out —
+shows up as recurring denials in `corral egress`; the agent works without it. Adding an agent is a
+template change for that box only: a Claude-only box renders exactly as
 before, so existing boxes are not drifted.
 
 ## Everyday commands
 
 | Command | What it does |
 |---|---|
-| `corral claude [-- args]` · `corral codex [-- args]` | Start the agent in this project's box (`--ask` keeps the agent's own prompts) |
+| `corral claude [-- args]` · `corral codex [-- args]` · `corral agy [-- args]` | Start the agent in this project's box (`--ask` keeps the agent's own prompts) |
 | `corral shell` | Interactive shell in the box |
 | `corral run <cmd>` | One command in the box, e.g. `corral run make test` |
 | `corral` | **Dashboard**: every box, status, live CPU/RAM/disk; `enter` launches, `h` shell, `s` start/stop, `l` log pane, `x` delete |
@@ -335,7 +340,8 @@ egress = ["registry.npmjs.org", "*.golang.org", "proxy.golang.org", "git.example
 
 On top of `egress`, each installed agent adds its own API and login hosts — Claude's
 `api.anthropic.com`, `*.anthropic.com`, `platform.claude.com` (the OAuth token refresh); Codex's
-`api.openai.com`, `auth.openai.com`, `chatgpt.com` — and hosts named in `git_tokens` are added
+`api.openai.com`, `auth.openai.com`, `chatgpt.com`; Antigravity's six `*.googleapis.com` hosts (see
+Agents) — and hosts named in `git_tokens` are added
 automatically. `corral egress` prints the effective list. Entries are exact hosts or `*.suffix` (subdomains only), ports
 80/443 unless `:port` is given; IP literals never match. Every tool that honours `HTTP(S)_PROXY`
 works (apt, npm, pip, go, git over https, curl, Claude Code); anything that ignores it fails, which is
@@ -707,7 +713,8 @@ log pane and signed releases.
 
 Next:
 
-- **additional agents** (Gemini CLI, OpenCode) via the agent interface — Codex shipped in 0.9;
+- **additional agents** (OpenCode, …) via the agent interface — Codex shipped in 0.9, Antigravity CLI
+  (Google's successor to Gemini CLI) in 0.10;
 - **Linux hosts** (Lima/qemu) and **Windows hosts** (Lima/WSL2);
 - `source = "sync"` (copy in, reviewed diff, write back once);
 - the Apple `container` driver as macOS 26 adoption grows.

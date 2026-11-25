@@ -40,8 +40,9 @@ var (
 	StatusOf = lipgloss.NewStyle().Foreground(Dim)
 )
 
-// Logo is the corral glyph used in banners.
-const Logo = "🐎"
+// Logo is the brand glyph used in banners: the spark of the logo (the agent
+// inside the fence), single-width text in any terminal.
+const Logo = "✦"
 
 // Banner prints the product header.
 func Banner(w io.Writer, version string) {

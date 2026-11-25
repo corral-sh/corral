@@ -9,7 +9,7 @@ LDFLAGS  := -s -w \
 PREFIX   ?= $(shell if [ -w /opt/homebrew/bin ]; then echo /opt/homebrew; else echo $(HOME)/.local; fi)
 BIN      := bin/corral
 
-.PHONY: build install test vet lint fmt security dist clean run e2e site docs
+.PHONY: build install test vet lint fmt security dist clean run e2e docs
 
 build: ## Build ./bin/corral for this machine
 	CGO_ENABLED=0 go build -trimpath -ldflags '$(LDFLAGS)' -o $(BIN) ./cmd/corral
@@ -41,9 +41,6 @@ e2e: build ## End-to-end on this Mac: throwaway boxes under a temp CORRAL_HOME, 
 
 docs: ## Regenerate docs/FEATURES.md (the feature catalog) from the code; a test fails when it is stale
 	go run ./cmd/corral docs > docs/FEATURES.md
-
-site: ## Render the project site (GitHub Pages) into public/ from README, docs and changelog
-	go run ./tools/site -out public -version "$(VERSION)"
 
 dist: ## Cross-compile release binaries into dist/
 	rm -rf dist && mkdir -p dist

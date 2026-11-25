@@ -1,6 +1,7 @@
 #!/bin/bash
-# Renders the site's raster images from tools/brand/card.html with headless
-# Chrome (macOS): the social card and the app icons. Re-run after changing the
+# Renders the brand's raster images from tools/brand/card.html with headless
+# Chrome (macOS): the site's social card and app icons, and the GitHub org
+# avatar and repo social preview. Re-run after changing the
 # mark or the card, and commit the PNGs it writes to site/assets/.
 #   tools/brand/render.sh
 set -euo pipefail
@@ -28,3 +29,10 @@ for s in 48 180 192 512; do
   [ "$s" = 180 ] && name="apple-touch-icon.png"
   shot "$src?icon=$s" "$s" "$s" "$out/$name"
 done
+
+# GitHub has no API for these; upload them by hand (see docs/assets/github/README.md).
+gh=docs/assets/github
+mkdir -p "$gh"
+echo "rendering into $gh/"
+shot "$src?w=1280&h=640" 1280 640 "$gh/social-preview.png"
+shot "$src?icon=1024" 1024 1024 "$gh/avatar.png"

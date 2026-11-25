@@ -57,9 +57,9 @@ new toolchain script version means a new golden, and "prune" removes the old.
 				if lc != nil {
 					disk = ui.HumanBytes(lima.DiskUsage(lc.InstanceDir(g.Name)))
 				}
-				table = append(table, []string{g.Name, joinNames(g.Toolchains), g.Disk, disk, fmt.Sprint(used[g.Name]), ui.Ago(g.CreatedAt), g.CorralVersion})
+				table = append(table, []string{g.Name, joinNames(g.Agents), joinNames(g.Toolchains), g.Disk, disk, fmt.Sprint(used[g.Name]), ui.Ago(g.CreatedAt), g.CorralVersion})
 			}
-			fmt.Println(ui.Table([]string{"GOLDEN", "TOOLCHAINS", "DISK", "HOST DISK", "BOXES", "BUILT", "CORRAL"}, table))
+			fmt.Println(ui.Table([]string{"GOLDEN", "AGENTS", "TOOLCHAINS", "DISK", "HOST DISK", "BOXES", "BUILT", "CORRAL"}, table))
 			return nil
 		},
 	}

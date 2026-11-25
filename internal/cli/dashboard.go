@@ -106,7 +106,14 @@ func runDashboard(ctx context.Context) error {
 		if action.Kind == "shell" {
 			return launch(ctx, nil, []string{"bash", "-l"}, &launchFlags{})
 		}
-		a, ok := agent.Lookup(cfg.DefaultAgent)
+		// The box's own default_agent (its project and per-box files may
+		// pick another agent, and a box installs only its agents), not the
+		// global one the dashboard was opened with.
+		name := cfg.DefaultAgent
+		if b, err := openBox(); err == nil {
+			name = b.Cfg.DefaultAgent
+		}
+		a, ok := agent.Lookup(name)
 		if !ok {
 			return launch(ctx, nil, []string{"bash", "-l"}, &launchFlags{})
 		}

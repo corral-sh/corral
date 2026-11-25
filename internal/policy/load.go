@@ -16,6 +16,8 @@ import (
 // by the user, not by the repository.
 func Load(globalPath, hostProjectPath, projectDir string) (*config.Config, error) {
 	merged := config.Defaults()
+	// trusted is every layer but the repository's: what the user enabled.
+	trusted := merged
 	var sources []string
 
 	if globalPath != "" {
@@ -25,6 +27,7 @@ func Load(globalPath, hostProjectPath, projectDir string) (*config.Config, error
 		}
 		if ok {
 			merged = config.Merge(merged, f)
+			trusted = config.Merge(trusted, f)
 			sources = append(sources, globalPath)
 		}
 	}
@@ -52,6 +55,7 @@ func Load(globalPath, hostProjectPath, projectDir string) (*config.Config, error
 		}
 		if ok {
 			merged = config.Merge(merged, f)
+			trusted = config.Merge(trusted, f)
 			sources = append(sources, hostProjectPath)
 		}
 	}
@@ -59,7 +63,26 @@ func Load(globalPath, hostProjectPath, projectDir string) (*config.Config, error
 	if err != nil {
 		return nil, err
 	}
+	cfg.TrustedAgents = trustedAgents(cfg.Agents, trusted)
 	ApplyProfile(cfg)
 	cfg.Sources = sources
 	return cfg, nil
+}
+
+// trustedAgents keeps the agents a trusted layer enabled. A repository may
+// install any agent (agents and default_agent are project-ok), but an agent's
+// API hosts join the broker allow-list only when the user enabled it too —
+// like egress, a repo may ask for a destination, never grant it.
+func trustedAgents(agents []string, trusted config.File) []string {
+	ok := map[string]bool{deref(trusted.DefaultAgent): true}
+	for _, a := range trusted.Agents {
+		ok[a] = true
+	}
+	var out []string
+	for _, a := range agents {
+		if ok[a] {
+			out = append(out, a)
+		}
+	}
+	return out
 }

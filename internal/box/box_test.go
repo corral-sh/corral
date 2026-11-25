@@ -12,6 +12,7 @@ import (
 
 	"github.com/corral-sh/corral/internal/agent"
 	_ "github.com/corral-sh/corral/internal/agent/claude"
+	_ "github.com/corral-sh/corral/internal/agent/codex"
 	"github.com/corral-sh/corral/internal/broker"
 	"github.com/corral-sh/corral/internal/config"
 	"github.com/corral-sh/corral/internal/guest"
@@ -1073,5 +1074,135 @@ func TestSaveMetaIsAtomic(t *testing.T) {
 		if e.Name() != "atom.json" {
 			t.Errorf("stray file left behind: %s", e.Name())
 		}
+	}
+}
+
+// a box installs the agents it is configured with, not every registered
+// one — a Claude-only box renders exactly as before codex existed.
+func TestRenderInstallsOnlyEnabledAgents(t *testing.T) {
+	yamlOf := func(f config.File) string {
+		t.Helper()
+		b := testBox(t, f)
+		out, _, err := b.RenderYAML()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(out)
+	}
+	def := yamlOf(config.File{})
+	if strings.Contains(def, "codex") || !strings.Contains(def, "claude.ready") {
+		t.Fatalf("default box must be claude-only")
+	}
+	both := yamlOf(config.File{Agents: []string{"codex"}})
+	for _, want := range []string{"claude.ready", "codex.ready", "CODEX_HOME", "/opt/corral/bin/codex", agent.StateDir("codex")} {
+		if !strings.Contains(both, want) {
+			t.Errorf("agents = [codex] render lacks %q", want)
+		}
+	}
+	only := yamlOf(config.File{Agents: []string{}, DefaultAgent: ptrTo("codex")})
+	if strings.Contains(only, "claude.ready") || !strings.Contains(only, "codex.ready") {
+		t.Errorf("agents = [], default_agent = codex must install codex alone")
+	}
+	b := testBox(t, config.File{Agents: []string{"gemini"}})
+	if _, err := b.Render(); err == nil || !strings.Contains(err.Error(), `unknown agent "gemini"`) {
+		t.Errorf("unknown agent: %v", err)
+	}
+}
+
+func TestEgressHostsFollowTrustedAgents(t *testing.T) {
+	b := testBox(t, config.File{Agents: []string{"codex"}})
+	hosts := strings.Join(EgressHosts(b.Cfg), " ")
+	if !strings.Contains(hosts, "api.anthropic.com") || !strings.Contains(hosts, "api.openai.com") {
+		t.Fatalf("both agents enabled by the user: %s", hosts)
+	}
+	b.Cfg.TrustedAgents = []string{"claude"} // codex came from the repo's file
+	hosts = strings.Join(EgressHosts(b.Cfg), " ")
+	if strings.Contains(hosts, "openai") {
+		t.Errorf("a repo-enabled agent must not open its API hosts: %s", hosts)
+	}
+	b.Cfg.Network = config.NetworkBroker
+	ag, _ := agent.Lookup("codex")
+	spec, err := b.BuildLaunch(ag, nil, true, map[string]string{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(strings.Join(spec.Warnings, "\n"), "its API hosts") {
+		t.Errorf("launch must say why codex cannot reach its API: %v", spec.Warnings)
+	}
+}
+
+func TestBuildLaunchRefusesAgentNotInstalled(t *testing.T) {
+	b := testBox(t, config.File{})
+	ag, _ := agent.Lookup("codex")
+	if _, err := b.BuildLaunch(ag, nil, true, map[string]string{}); err == nil || !strings.Contains(err.Error(), "is not installed in box") {
+		t.Errorf("codex in a claude-only box: %v", err)
+	}
+	b = testBox(t, config.File{Agents: []string{"codex"}})
+	b.Meta = &Meta{Agents: []string{"claude"}} // built before codex was enabled
+	if _, err := b.BuildLaunch(ag, nil, true, map[string]string{}); err == nil || !strings.Contains(err.Error(), "built without it") {
+		t.Errorf("codex enabled but not built: %v", err)
+	}
+}
+
+func ptrTo[T any](v T) *T { return &v }
+
+// A repo that enables an agent must not get the user's shared login for it:
+// the agent is isolated in that box until a trusted layer enables it.
+func TestRepoEnabledAgentGetsNoSharedLogin(t *testing.T) {
+	b := testBox(t, config.File{Agents: []string{"codex"}})
+	b.Cfg.TrustedAgents = []string{"claude"} // codex came from the project file
+	out, _, err := b.RenderYAML()
+	if err != nil {
+		t.Fatal(err)
+	}
+	codexHost, _ := paths.AgentStateDir("codex")
+	claudeHost, _ := paths.AgentStateDir("claude")
+	if strings.Contains(string(out), codexHost) {
+		t.Errorf("the shared codex login %s is mounted into a box only the repo enabled codex for", codexHost)
+	}
+	if !strings.Contains(string(out), claudeHost) {
+		t.Errorf("the trusted claude login must still be shared")
+	}
+	if !strings.Contains(string(out), "install -d -m 0700 -o \"$CORRAL_USER\" "+guest.ShellQuote(agent.StateDir("codex"))) {
+		t.Errorf("codex needs its own per-box state dir")
+	}
+	for _, mode := range []string{config.AgentStateSeeded, config.AgentStateShared} {
+		b.Cfg.AgentState = mode
+		out, _, _ := b.RenderYAML()
+		if strings.Contains(string(out), codexHost) || strings.Contains(string(out), agent.SeedDir("codex")) {
+			t.Errorf("agent_state %s: codex host state reached the box", mode)
+		}
+	}
+	ag, _ := agent.Lookup("codex")
+	spec, err := b.BuildLaunch(ag, nil, true, map[string]string{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(strings.Join(spec.Warnings, "\n"), "its own empty login") {
+		t.Errorf("launch must say codex is not using the shared login: %v", spec.Warnings)
+	}
+}
+
+// Each agent's credential variables go to its own sessions only; the default
+// forward_env (Claude's) must not reach a codex session.
+func TestCredentialsForwardedOnlyToTheirAgent(t *testing.T) {
+	b := testBox(t, config.File{Agents: []string{"codex"}})
+	host := map[string]string{"ANTHROPIC_API_KEY": "a", "CLAUDE_CODE_OAUTH_TOKEN": "c", "OPENAI_API_KEY": "o"}
+	codex, _ := agent.Lookup("codex")
+	claude, _ := agent.Lookup("claude")
+	spec, err := b.BuildLaunch(codex, nil, true, host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.Env["ANTHROPIC_API_KEY"] != "" || spec.Env["CLAUDE_CODE_OAUTH_TOKEN"] != "" || spec.Env["OPENAI_API_KEY"] != "o" {
+		t.Errorf("codex session env: %v", spec.Forwarded)
+	}
+	spec, _ = b.BuildLaunch(claude, nil, true, host)
+	if spec.Env["OPENAI_API_KEY"] != "" || spec.Env["ANTHROPIC_API_KEY"] != "a" {
+		t.Errorf("claude session env: %v", spec.Forwarded)
+	}
+	spec, _ = b.BuildLaunch(nil, []string{"true"}, true, host) // shell/run: unchanged
+	if spec.Env["ANTHROPIC_API_KEY"] != "a" {
+		t.Errorf("run keeps the default forward_env: %v", spec.Forwarded)
 	}
 }

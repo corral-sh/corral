@@ -11,7 +11,6 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/corral-sh/corral/internal/agent"
 	"github.com/corral-sh/corral/internal/lima"
 	"github.com/corral-sh/corral/internal/paths"
 )
@@ -112,7 +111,7 @@ func (b *Box) saveGoldenMeta(ctx context.Context, name string) error {
 	now := time.Now()
 	return SaveMeta(&Meta{
 		Name: name, Golden: true, CreatedAt: now, LastUsed: now,
-		Agents: agent.Names(), Toolchains: b.Cfg.Toolchains,
+		Agents: b.AgentNames(), Toolchains: b.Cfg.Toolchains,
 		CPUs: b.Cfg.CPUs, Memory: b.Cfg.Memory, Disk: b.Cfg.Disk,
 		CorralVersion: b.Version, LimaVersion: limaVer,
 	})

@@ -2,6 +2,8 @@
 package claude
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/corral-sh/corral/internal/agent"
@@ -117,4 +119,25 @@ func (Claude) HostConfigImports() map[string]string {
 func (Claude) LoginHint() string {
 	return "Run `/login` inside Claude once; the session is stored in ~/.corral/agents/claude and reused by every box. " +
 		"Alternatively export ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN (from `claude setup-token`) on the host."
+}
+
+// EgressHosts implements agent.Agent. platform.claude.com is where Claude Code
+// refreshes its OAuth access token; without it a subscription login works
+// until the first token expiry and then fails with "Re-authenticate to
+// continue" inside every broker box.
+func (Claude) EgressHosts() []string {
+	return []string{"api.anthropic.com", "*.anthropic.com", "platform.claude.com"}
+}
+
+// LoggedIn implements agent.Agent.
+func (c Claude) LoggedIn(stateDir string, getenv func(string) string) bool {
+	if _, err := os.Stat(filepath.Join(stateDir, ".credentials.json")); err == nil {
+		return true
+	}
+	for _, k := range c.ForwardEnv() {
+		if getenv(k) != "" {
+			return true
+		}
+	}
+	return false
 }

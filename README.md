@@ -2,7 +2,7 @@
 
 **Your agent, unleashed. Your Mac, untouched.**
 
-Run AI coding agents at full speed inside a persistent, per-project VM.
+Run AI coding agents — **Claude Code** and **Codex** — at full speed inside a persistent, per-project VM.
 
 Corral is built on [Lima](https://lima-vm.io) and Apple's Virtualization
 framework, after a real supply-chain incident involving AI tooling. Each
@@ -15,7 +15,7 @@ the roadmap via Lima's qemu/WSL2 drivers.**
 
 ```
 cd ~/Code/my-project
-corral claude
+corral claude        # or: corral codex
 ```
 
 That is the whole workflow. The first box on a Mac builds a **golden image**
@@ -55,7 +55,7 @@ flowchart LR
     end
     subgraph vm["Lima VM (Apple Virtualization) — one per project"]
         direction TB
-        agent["Claude Code<br/>no permission prompts"]
+        agent["Claude Code · Codex<br/>no permission prompts"]
         mount["/Users/you/Code/project<br/>virtiofs · same path · same uid"]
         local["box disk<br/>box_dirs · toolchains · agent state"]
         nft["nftables funnel<br/>only the broker · no DNS · no sudo"]
@@ -78,6 +78,7 @@ flowchart LR
 | **Egress control** | `network = "broker"`: only the hosts you list, decided on the Mac, DNS closed in the guest, every denial named. `offline` for review sessions. [→](#network-modes--where-the-box-may-connect) |
 | **Untrusted repositories** | A repo's `.corral.toml` can shape the guest, never widen host access; `source = "clone"` mounts nothing at all. [→](#source-modes--how-the-code-reaches-the-box) |
 | **Speed** | Golden images: the second project is ready in ~15 s; `box_dirs` keeps `node_modules` on the box disk (29× faster installs); 1.4 s overhead per invocation. |
+| **Agents** | Claude Code and Codex CLI on one agent interface; `agents` picks what a box installs, each agent's credentials reach only its own sessions. [→](#agents) |
 | **Your login, your rules** | `agent_state = shared \| seeded \| isolated`; tokens from the environment or the macOS Keychain (`keychain_env`), forwarded over SSH, never on a command line. [→](#agent-state--where-the-login-lives) |
 | **Toolchains** | node · go · python · docker · java · android (aapt2 under Rosetta) · flutter — checksum-verified; node, go and flutter can be pinned to a release. [→](#toolchains) |
 | **Undo** | APFS-clone snapshots at every session start; `corral undo`. [→](#snapshots-and-undo) |
@@ -127,11 +128,12 @@ Then:
 corral setup       # 1 minute: prerequisites + defaults (CPUs, RAM, toolchains…)
 cd ~/Code/<project>
 corral claude      # builds the box, starts Claude Code inside it
+corral codex       # or Codex — see Agents below for enabling it
 ```
 
-Log in once with `/login` inside Claude; the session is stored in
-`~/.corral/agents/claude` and reused by every box (`agent_state = "shared"`). Or export
-`ANTHROPIC_API_KEY` / `CLAUDE_CODE_OAUTH_TOKEN` on your Mac and it is forwarded.
+Log in once inside the box — `/login` in Claude, `codex login --device-auth` for Codex; the login is
+stored in `~/.corral/agents/<agent>` and reused by every box (`agent_state = "shared"`). Or export
+the agent's API key on your Mac and it is forwarded to that agent's sessions.
 
 Upgrading later: `corral upgrade` (runs `brew upgrade` or, for a checkout
 install, pulls and rebuilds). A release that changes the Lima template (mounts,
@@ -139,17 +141,49 @@ provisioning, resources — the changelog says so) leaves existing boxes showing
 *config changed* in `corral list`; run `corral rebuild` once per box to
 pick it up.
 
+## Agents
+
+| | **Claude Code** | **Codex CLI** |
+|---|---|---|
+| Launch | `corral claude` | `corral codex` |
+| Installed | by default | when `agents` (or `default_agent`) names it |
+| From | Anthropic's installer, `claude.ai/install.sh` | the release binary from `github.com/openai/codex`, verified against the sha256 digest GitHub records for it — no npm |
+| Log in once | `/login` inside Claude | `codex login --device-auth` (a code, no browser callback) or `printenv OPENAI_API_KEY \| codex login --with-api-key` |
+| Host variables forwarded (to its own sessions only) | `ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN` | `OPENAI_API_KEY`, `CODEX_API_KEY` |
+| Yolo (default) | `--dangerously-skip-permissions` | `--dangerously-bypass-approvals-and-sandbox` |
+| `--ask` | Claude's own prompts | Codex's approval prompts, with `--sandbox danger-full-access` — Codex's Linux sandbox needs user namespaces that Ubuntu 24.04's AppArmor denies in the box; the VM is the sandbox |
+| State (login, settings, history) | `~/.corral/agents/claude` (`CLAUDE_CONFIG_DIR`) | `~/.corral/agents/codex` (`CODEX_HOME`) |
+| Broker hosts it adds | `api.anthropic.com`, `*.anthropic.com`, `platform.claude.com` | `api.openai.com`, `auth.openai.com`, `chatgpt.com` |
+| `--import-config` copies | `~/.claude/{CLAUDE.md,settings.json,skills,agents,commands}` | `~/.codex/{config.toml,AGENTS.md,prompts,skills}` |
+
+Enable Codex for every box, or for one:
+
+```toml
+# ~/.corral/config.toml (every box) — or ~/.corral/projects/<box>.toml (one box)
+agents = ["codex"]                 # unioned with the default ["claude"]; then `corral rebuild <box>`
+
+# a Codex-only box:  agents = []  +  default_agent = "codex"
+```
+
+A repository may put `agents` in its `.corral.toml` too — it only installs a CLI in the guest — but an
+agent **only the repository** enabled gets its own empty login in that box (your shared
+`~/.corral/agents/<agent>` is not mounted for it) and, in broker mode, none of its API hosts. The
+launcher says so and names the line for your own file. Launching an agent the box was not built with
+names the file to edit and the `rebuild` it takes. `corral agents` lists both and whether a login is
+stored. Adding Codex is a template change for that box only: a Claude-only box renders exactly as
+before, so existing boxes are not drifted.
+
 ## Everyday commands
 
 | Command | What it does |
 |---|---|
-| `corral claude [-- args]` | Start Claude Code in this project's box (`--ask` keeps Claude's permission prompts) |
+| `corral claude [-- args]` · `corral codex [-- args]` | Start the agent in this project's box (`--ask` keeps the agent's own prompts) |
 | `corral shell` | Interactive shell in the box |
 | `corral run <cmd>` | One command in the box, e.g. `corral run make test` |
 | `corral` | **Dashboard**: every box, status, live CPU/RAM/disk; `enter` launches, `h` shell, `s` start/stop, `l` log pane, `x` delete |
 | `corral list [--json]` / `info` / `logs` | Status table (read-only; `--json` adds live guest metrics per running box) · details of one box · boot/provisioning log |
 | `corral gc` | Stop boxes idle longer than their `idle_stop` (also runs on launch and in the dashboard — never from `list`) |
-| `corral agents import claude` | Copy your `~/.claude` commands, skills, agents, settings and `CLAUDE.md` (never credentials) into the agent's box state — every box sees them |
+| `corral agents import claude` (or `codex`) | Copy your `~/.claude` commands, skills, agents, settings and `CLAUDE.md` — or `~/.codex` config, `AGENTS.md`, prompts and skills — (never credentials) into the agent's box state; every box sees them |
 | `--yes` / `--no-create` | First run in a project asks before building its box (a wrong directory is a 3 GB accident); `--yes` skips the question, `--no-create` refuses instead. Non-interactive runs (`CORRAL_PLAIN=1`, no TTY) never ask |
 | `corral stop [--all]` | Free the RAM; next start ≈ 20 s |
 | `corral rebuild` | Apply config changes (resources, toolchains, mounts) |
@@ -173,6 +207,7 @@ Lists (packages, env, mounts…) are unioned so a project adds to the global set
 
 ```toml
 default_agent = "claude"
+agents = ["claude"]                # + "codex"; default_agent is always installed
 cpus = 4
 memory = "4GiB"                    # measured default; "6GiB" with docker or big Go builds
 disk = "60GiB"                     # sparse — only used space costs anything
@@ -219,7 +254,7 @@ A project may raise the profile, never lower it; `--profile strict` raises it fo
 `corral info` prints the effective profile.
 
 `strict` means **no ambient environment**: `forward_env` and the agent's own credential variables
-(`CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`) are *not* forwarded even when the host has them —
+(Claude's `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`; Codex's `OPENAI_API_KEY`, `CODEX_API_KEY`) are *not* forwarded even when the host has them —
 `corral config` marks `forward_env` as suppressed and the launcher warns per dropped variable.
 The explicit paths still work under `strict` and are the intended ones: `keychain_env`,
 `env_from_host`, `env`, `env_file`, or `api_brokers` so the token never enters the box at all.
@@ -298,9 +333,10 @@ network = "broker"
 egress = ["registry.npmjs.org", "*.golang.org", "proxy.golang.org", "git.example.com:8443"]
 ```
 
-Defaults are the agents' API and login hosts (`api.anthropic.com`, `*.anthropic.com`,
-`platform.claude.com` — the OAuth token refresh); hosts named in
-`git_tokens` are added automatically. Entries are exact hosts or `*.suffix` (subdomains only), ports
+On top of `egress`, each installed agent adds its own API and login hosts — Claude's
+`api.anthropic.com`, `*.anthropic.com`, `platform.claude.com` (the OAuth token refresh); Codex's
+`api.openai.com`, `auth.openai.com`, `chatgpt.com` — and hosts named in `git_tokens` are added
+automatically. `corral egress` prints the effective list. Entries are exact hosts or `*.suffix` (subdomains only), ports
 80/443 unless `:port` is given; IP literals never match. Every tool that honours `HTTP(S)_PROXY`
 works (apt, npm, pip, go, git over https, curl, Claude Code); anything that ignores it fails, which is
 the control working. SSH-based git is not carried — use `git_tokens` over https. The broker is a
@@ -667,7 +703,7 @@ log pane and signed releases.
 
 Next:
 
-- **additional agents** (Codex, Gemini CLI, OpenCode) via the agent interface;
+- **additional agents** (Gemini CLI, OpenCode) via the agent interface — Codex shipped in 0.9;
 - **Linux hosts** (Lima/qemu) and **Windows hosts** (Lima/WSL2);
 - `source = "sync"` (copy in, reviewed diff, write back once);
 - the Apple `container` driver as macOS 26 adoption grows.

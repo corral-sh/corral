@@ -485,7 +485,7 @@ func newInfoCmd() *cobra.Command {
 			ui.Section(os.Stdout, "Box")
 			ui.KV(os.Stdout, "box", ui.Bold.Render(b.Name)+"  "+ui.StatusBadge(status)+"  "+ui.DriftBadge(drifted))
 			ui.KV(os.Stdout, "project", b.Project)
-			ui.KV(os.Stdout, "agents", joinNames(agentNames()))
+			ui.KV(os.Stdout, "agents", joinNames(b.AgentNames()))
 			ui.KV(os.Stdout, "config files", joinNames(b.Cfg.Sources))
 			if b.Cfg.Profile != config.ProfileDefault {
 				ui.KV(os.Stdout, "profile", b.Cfg.Profile+ui.Subtle.Render("  ("+policy.ProfileGuarantee(b.Cfg.Profile)+")"))

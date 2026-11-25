@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"syscall"
@@ -23,8 +24,10 @@ import (
 // like sessions are, started by whatever starts the box and stopped by
 // whatever stops it. Daemon-free, like idle_stop.
 
-// EgressHosts is the effective allow-list: the configured egress entries plus
-// every host a git token is configured for (the box must reach those to push).
+// EgressHosts is the effective allow-list: the configured egress entries, the
+// API hosts of the box's agents that a trusted layer enabled (a repo may
+// install an agent, not open its API — see policy.trustedAgents), and every
+// host a git token is configured for (the box must reach those to push).
 func EgressHosts(cfg *config.Config) []string {
 	seen := map[string]bool{}
 	var out []string
@@ -36,6 +39,13 @@ func EgressHosts(cfg *config.Config) []string {
 	}
 	for _, e := range cfg.Egress {
 		add(e)
+	}
+	for _, a := range EnabledAgents(cfg) {
+		if slices.Contains(cfg.TrustedAgents, a.Name()) {
+			for _, h := range a.EgressHosts() {
+				add(h)
+			}
+		}
 	}
 	hosts := make([]string, 0, len(cfg.GitTokens))
 	for h := range cfg.GitTokens {

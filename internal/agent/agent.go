@@ -1,10 +1,10 @@
 // Package agent defines the extension point for AI coding agents.
 //
-// Adding support for a new agent means implementing Agent in a new sub-package
-// and registering it in registry.go — nothing else in Corral needs to
-// change. The CLI grows a `corral <name>` shortcut, the guest provisioning
-// gains the agent's install script, and a persistent state directory is
-// mounted automatically.
+// Adding support for a new agent means implementing Agent in a new sub-package,
+// registering it in init() and blank-importing it in cmd/corral — nothing
+// else in Corral needs to change. The CLI grows a `corral <name>`
+// shortcut; a box whose `agents` names it gains the agent's install script, a
+// persistent state directory and, in broker mode, the agent's API hosts.
 package agent
 
 import (
@@ -64,6 +64,14 @@ type Agent interface {
 	HostConfigImports() map[string]string
 	// LoginHint tells the user how to authenticate inside the box.
 	LoginHint() string
+	// EgressHosts are the destinations the agent needs to work (its API,
+	// login and token refresh). In network = "broker" they are added to the
+	// allow-list of every box the agent is installed in, and only those.
+	EgressHosts() []string
+	// LoggedIn reports whether a login is stored in the host state dir, or a
+	// credential variable is exported (getenv is the host environment). A
+	// heuristic for `corral doctor`.
+	LoggedIn(stateDir string, getenv func(string) string) bool
 }
 
 // StateSeeder is an optional interface for agents whose *fresh* state

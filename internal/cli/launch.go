@@ -485,7 +485,7 @@ func createBox(ctx context.Context, b *box.Box) error {
 		ui.KV(os.Stderr, "box", b.Name)
 		ui.KV(os.Stderr, "resources", fmt.Sprintf("%d CPU · %s RAM · %s disk (sparse)", b.Cfg.CPUs, b.Cfg.Memory, b.Cfg.Disk))
 		ui.KV(os.Stderr, "toolchains", joinNames(b.Cfg.Toolchains))
-		ui.KV(os.Stderr, "agents", joinNames(agent.Names()))
+		ui.KV(os.Stderr, "agents", joinNames(b.AgentNames()))
 		if len(b.Cfg.Packages) > 0 {
 			ui.KV(os.Stderr, "packages", strings.Join(b.Cfg.Packages, " "))
 		}

@@ -25,8 +25,6 @@ import (
 	"github.com/corral-sh/corral/internal/ui"
 )
 
-func agentNames() []string { return agent.Names() }
-
 func printJSON(v any) error {
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
@@ -215,7 +213,7 @@ set on the Mac, provision scripts of this boot. Exit status is non-zero when any
 			}
 			for _, a := range agent.All() {
 				dir, _ := paths.AgentStateDir(a.Name())
-				loggedIn := agentLoggedIn(a.Name(), dir)
+				loggedIn := a.LoggedIn(dir, os.Getenv)
 				state := ui.Subtle.Render("no login stored yet — " + a.LoginHint())
 				if loggedIn {
 					state = ui.Ok.Render("login stored in " + ui.ShortenHome(dir))
@@ -230,20 +228,6 @@ set on the Mac, provision scripts of this boot. Exit status is non-zero when any
 	}
 	cmd.Flags().BoolVar(&asJSON, "json", false, "machine-readable output (box preflight)")
 	return cmd
-}
-
-// agentLoggedIn is a heuristic: the state dir has a credentials file.
-func agentLoggedIn(name, dir string) bool {
-	switch name {
-	case "claude":
-		if _, err := os.Stat(filepath.Join(dir, ".credentials.json")); err == nil {
-			return true
-		}
-		if os.Getenv("ANTHROPIC_API_KEY") != "" || os.Getenv("CLAUDE_CODE_OAUTH_TOKEN") != "" {
-			return true
-		}
-	}
-	return false
 }
 
 // checkHost is the fast pre-flight before touching Lima.
@@ -323,7 +307,7 @@ func newAgentsCmd() *cobra.Command {
 			for _, a := range agent.All() {
 				dir, _ := paths.AgentStateDir(a.Name())
 				login := ui.Subtle.Render("not yet")
-				if agentLoggedIn(a.Name(), dir) {
+				if a.LoggedIn(dir, os.Getenv) {
 					login = ui.Ok.Render("stored")
 				}
 				rows = append(rows, []string{a.Name(), a.Summary(), strings.Join(a.YoloArgs(), " "), login, ui.ShortenHome(dir)})
@@ -761,7 +745,8 @@ func printResolved(w io.Writer, cfg *config.Config) {
 	}
 	ui.KV(w, "box_dirs", joinNames(bd))
 	ui.KV(w, "network", cfg.Network)
-	ui.KV(w, "egress", joinNames(cfg.Egress)+ui.Subtle.Render("  (broker mode; git_tokens hosts added automatically)"))
+	ui.KV(w, "agents", joinNames(cfg.Agents))
+	ui.KV(w, "egress", joinNames(box.EgressHosts(cfg))+ui.Subtle.Render("  (broker mode; includes the agents' API hosts and git_tokens hosts)"))
 	var apis []string
 	for _, ab := range cfg.APIBrokers {
 		apis = append(apis, fmt.Sprintf("%s → %s ← %s (%d rule(s))", ab.Name, ab.Upstream, ab.Token, len(ab.Allow)))

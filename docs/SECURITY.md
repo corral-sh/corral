@@ -32,7 +32,7 @@ a key is added without one):
 
 | Class | Keys | Rule |
 |---|---|---|
-| project-ok | `toolchains`, `packages`, `provision`, `hide`, `box_dirs`, `rosetta`, `idle_stop`, `golden`, `default_agent`, `stop_on_exit`, `disk`, `cpus`, `memory` | guest-only effect; `cpus`/`memory` capped against the host; `provision` entries must resolve (symlinks followed) to regular files inside the project; `hide` / `box_dirs` entries are confined to the project (never `.git`, never `..`) |
+| project-ok | `toolchains`, `packages`, `provision`, `hide`, `box_dirs`, `rosetta`, `idle_stop`, `golden`, `default_agent`, `agents`, `stop_on_exit`, `disk`, `cpus`, `memory` | guest-only effect; `cpus`/`memory` capped against the host; `provision` entries must resolve (symlinks followed) to regular files inside the project; `hide` / `box_dirs` entries are confined to the project (never `.git`, never `..`); `agents` / `default_agent` install an agent in the guest, but an agent only the repo enabled gets its own empty login (your shared `~/.corral/agents/<agent>` is never mounted for it) and, in broker mode, none of its API hosts — only **your** config enables those (a repo may ask, never grant); each agent's credential variables are forwarded only to sessions of that agent |
 | project-may-tighten | `yolo`, `readonly_project`, `agent_state` (`shared → seeded → isolated`; `shared_agent_state` is its alias), `git_identity`, `no_env_passthrough`, `protect_git_metadata`, `network` (`full → broker → offline`), `profile`, `env` | a repo may only make the box stricter (a `profile` is a floor for its bundle of keys — see README); `env` accepts literal `KEY=value` only |
 | trusted-only | `ssh_agent`, `mounts`, `git_tokens`, `egress`, `api_brokers`, `forward_env`, `env_from_host`, `keychain_env`, `env_file`, `max_running`, `memory_reserve`, `timeout`, `name` | refused in the project file; `~/.corral/config.toml`, `~/.corral/projects/<box>.toml` or flags |
 
@@ -135,7 +135,8 @@ each. They are the items to weigh before running an untrusted repository.
 ## Secrets
 
 * **Nothing is forwarded implicitly except** the agent's own auth variables
-  (`ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN`) and terminal variables
+  (Claude: `ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN`; Codex: `OPENAI_API_KEY`,
+  `CODEX_API_KEY` — each only to sessions of its own agent) and terminal variables
   (`TERM`, `LANG`, `TZ`). `no_env_passthrough = true` disables even that.
 * `env_from_host = ["GH_TOKEN=CORRAL_RO_TOKEN"]` gives the box a narrower
   credential under the name tools expect. It **fails closed**: if
@@ -162,6 +163,7 @@ each. They are the items to weigh before running an untrusted repository.
 | Go | go.dev/dl | sha256 from go.dev metadata checked |
 | Docker | Ubuntu `docker.io` package | apt signature |
 | Claude Code | `https://claude.ai/install.sh` (Anthropic) | vendor's installer; the only `curl \| bash` in the box |
+| Codex CLI (when `agents` names it) | release binary from `github.com/openai/codex` | sha256 digest GitHub records for the release asset, checked before extraction (same origin as the download: catches a corrupt or swapped CDN object, not a compromised release) |
 | Lima | homebrew-core's `lima` formula, built from the upstream tarball (sha256 in the formula) | Lima pins the guest OS image by digest per release; `doctor` reports a Lima release other than the tested one |
 | corral | this repository, built locally by `install.sh` / the Homebrew formula from the git tag | you can read it; release binaries on the GitHub release come with `SHA256SUMS` **signed by minisign** (`SHA256SUMS.minisig`; public key `release/minisign.pub`, secret key only in a GitHub Actions secret) — `minisign -Vm SHA256SUMS -p minisign.pub && shasum -a 256 -c SHA256SUMS` |
 | Golden image | built on your Mac from the components above, once per toolchain set | same inputs as a from-scratch box; `corral golden` lists them, `golden prune` removes old ones |

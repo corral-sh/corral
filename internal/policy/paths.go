@@ -109,7 +109,7 @@ func ExtraMount(m config.Mount) error {
 	if m.Host == home {
 		return fmt.Errorf("mount %s: refusing to mount your entire home directory", m.Host)
 	}
-	for _, sensitive := range []string{".ssh", ".aws", ".gnupg", ".config/gh", ".kube", ".docker", ".claude", ".zshenv", ".zshrc", ".bash_profile", ".netrc"} {
+	for _, sensitive := range []string{".ssh", ".aws", ".gnupg", ".config/gh", ".kube", ".docker", ".claude", ".codex", ".zshenv", ".zshrc", ".bash_profile", ".netrc"} {
 		p := filepath.Join(home, sensitive)
 		if m.Host == p || strings.HasPrefix(p, m.Host+string(os.PathSeparator)) {
 			return fmt.Errorf("mount %s would expose %s to the box; forward a scoped token with env_from_host instead", m.Host, p)

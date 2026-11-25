@@ -4,6 +4,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -125,6 +126,28 @@ func TestEmptyToolchainsReplacesDefault(t *testing.T) {
 	// A later layer can add again on top of an emptied list.
 	if got := Merge(Merge(Defaults(), explicit), File{Toolchains: []string{"go"}}).Toolchains; len(got) != 1 || got[0] != "go" {
 		t.Errorf("adding after [] : %v", got)
+	}
+}
+
+// agents works like toolchains, and default_agent is always installed.
+func TestAgentsLayering(t *testing.T) {
+	var empty File
+	if _, err := toml.Decode("agents = []\ndefault_agent = \"codex\"\n", &empty); err != nil {
+		t.Fatal(err)
+	}
+	c, err := Resolve(Merge(Merge(Defaults(), File{Agents: []string{"codex"}}), empty))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(c.Agents, ",") != "codex" || strings.Join(c.TrustedAgents, ",") != "codex" {
+		t.Errorf("agents = [] + default_agent = codex: agents %v, trusted %v", c.Agents, c.TrustedAgents)
+	}
+	c, err = Resolve(Merge(Defaults(), File{Agents: []string{"codex"}}))
+	if err != nil || strings.Join(c.Agents, ",") != "claude,codex" {
+		t.Errorf("agents unioned with the default: %v %v", c.Agents, err)
+	}
+	if _, err := Resolve(Merge(Defaults(), File{Agents: []string{"Bad Name"}})); err == nil {
+		t.Error("an agents entry that is not a name must be refused")
 	}
 }
 

@@ -18,6 +18,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -33,6 +34,7 @@ const ProjectFileName = ".corral.toml"
 // zero value so that layers can be merged.
 type File struct {
 	DefaultAgent       *string             `toml:"default_agent,omitempty"`
+	Agents             []string            `toml:"agents,omitempty"` // agents installed in the box; default_agent is always among them
 	CPUs               *int                `toml:"cpus,omitempty"`
 	Memory             *string             `toml:"memory,omitempty"`
 	Disk               *string             `toml:"disk,omitempty"`
@@ -166,6 +168,8 @@ func (g GitToken) String() string {
 // Config is the fully resolved configuration used by the rest of the program.
 type Config struct {
 	DefaultAgent       string
+	Agents             []string // installed in the box, default_agent first; see Resolve
+	TrustedAgents      []string // the subset a trusted layer enabled: only their API hosts join the broker allow-list (policy.Load)
 	CPUs               int
 	Memory             string
 	Disk               string
@@ -248,13 +252,6 @@ func NetworkRank(n string) int {
 	}
 	return -1
 }
-
-// DefaultEgress is the allow-list every broker box starts from: the agents'
-// API hosts. Hosts named in git_tokens are added automatically.
-// platform.claude.com is where Claude Code refreshes its OAuth access token;
-// without it a subscription login works until the first token expiry and then
-// fails with "Re-authenticate to continue" inside every broker box.
-var DefaultEgress = []string{"api.anthropic.com", "*.anthropic.com", "platform.claude.com"}
 
 // Snapshot modes. Auto takes a copy-on-write snapshot of the box disk at
 // session start when the box is stopped (the normal case with idle_stop),
@@ -358,6 +355,7 @@ func SplitToolchainVersion(v string) (version, commit string) {
 func Defaults() File {
 	return File{
 		DefaultAgent:       ptr("claude"),
+		Agents:             []string{"claude"},
 		CPUs:               ptr(4),
 		Memory:             ptr("4GiB"), // measured, see docs/FEASIBILITY.md §4; docker toolchain: 6GiB
 		Disk:               ptr("60GiB"),
@@ -379,7 +377,6 @@ func Defaults() File {
 		ProtectGitMetadata: ptr(true),
 		MemoryReserve:      ptr("8GiB"), // what doctor's "Box budget" has always kept for macOS
 		ForwardEnv:         []string{"ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN"},
-		Egress:             DefaultEgress,
 		Toolchains:         []string{"node"},
 	}
 }
@@ -502,6 +499,13 @@ func Merge(a, b File) File {
 	if b.Timeout != nil {
 		out.Timeout = b.Timeout
 	}
+	// agents, like toolchains, is what gets installed: `agents = []` drops
+	// the layers below (a codex-only box: agents = [], default_agent = "codex").
+	if b.Agents != nil && len(b.Agents) == 0 {
+		out.Agents = []string{}
+	} else {
+		out.Agents = union(a.Agents, b.Agents)
+	}
 	out.Packages = union(a.Packages, b.Packages)
 	// toolchains is what gets installed, not a restriction: an explicitly
 	// empty list in a layer (`toolchains = []`) replaces what the layers below
@@ -580,12 +584,16 @@ var (
 	// response).
 	gitUserRe = regexp.MustCompile(`^[A-Za-z0-9._+-]{1,128}$`)
 	egressRe  = regexp.MustCompile(`^(\*\.)?[A-Za-z0-9][A-Za-z0-9.-]*(:[0-9]{1,5})?$`)
+	// agentNameRe is the shape of a registered agent name; whether one is
+	// registered is checked where the registry is visible (box.Render).
+	agentNameRe = regexp.MustCompile(`^[a-z][a-z0-9-]{0,30}$`)
 )
 
 // Resolve validates a merged File and turns it into a Config.
 func Resolve(f File) (*Config, error) {
 	c := &Config{
 		DefaultAgent:       deref(f.DefaultAgent),
+		Agents:             union([]string{deref(f.DefaultAgent)}, f.Agents),
 		CPUs:               deref(f.CPUs),
 		Memory:             deref(f.Memory),
 		Disk:               deref(f.Disk),
@@ -653,6 +661,7 @@ func Resolve(f File) (*Config, error) {
 		return nil, fmt.Errorf("agent_state %q must be one of %s", c.AgentState, strings.Join(AgentStates, ", "))
 	}
 	c.SharedAgentState = c.AgentState == AgentStateShared
+	c.TrustedAgents = slices.Clone(c.Agents) // no layers here; policy.Load narrows it to what the user enabled
 	if c.Snapshot != SnapshotOff && c.Snapshot != SnapshotAuto {
 		return nil, fmt.Errorf("snapshot %q must be %q or %q", c.Snapshot, SnapshotOff, SnapshotAuto)
 	}
@@ -664,6 +673,11 @@ func Resolve(f File) (*Config, error) {
 	}
 	if NetworkRank(c.Network) < 0 {
 		return nil, fmt.Errorf("network %q must be one of %s", c.Network, strings.Join(Networks, ", "))
+	}
+	for _, a := range c.Agents {
+		if !agentNameRe.MatchString(a) {
+			return nil, fmt.Errorf("agents entry %q is not an agent name (see `corral agents`)", a)
+		}
 	}
 	for _, e := range c.Egress {
 		if !egressRe.MatchString(e) {

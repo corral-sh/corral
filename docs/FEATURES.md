@@ -2,7 +2,7 @@
 
 One line per command, config key, mode and guest control. Generated from the code by `corral docs`
 (`make docs` rewrites this file; a test fails when it is stale). `corral docs --json` prints the same
-catalog as JSON. Narrative and examples: [README](../README.md) · threat model: [SECURITY.md](SECURITY.md) ·
+catalog as JSON. Narrative and examples: [GUIDE](GUIDE.md) · threat model: [SECURITY.md](SECURITY.md) ·
 design: [ARCHITECTURE.md](ARCHITECTURE.md) · measurements: [FEASIBILITY.md](FEASIBILITY.md).
 
 **What it is:** each project gets its own Linux VM (Lima + Apple Virtualization) in which an AI coding agent
@@ -19,6 +19,7 @@ repositories are not there. A repository's own config can shape the guest but ne
 | `corral audit` | Insight & setup | Show the session audit log (who launched what, where, with which env) |
 | `corral claude [-- agent args...]` | Agents | Launch Claude Code (Anthropic) — installed from the official installer |
 | `corral code` | Agents | Open the project inside the box in VS Code (or Cursor / JetBrains) over SSH |
+| `corral codex [-- agent args...]` | Agents | Launch Codex CLI (OpenAI) — release binary from github.com/openai/codex, sha256-verified |
 | `corral config` | Insight & setup | Show the resolved configuration for the current project |
 | `corral config init` |  | Write a commented .corral.toml into the project (--host: your per-project file instead) |
 | `corral config path` |  | Print the global config file path |
@@ -61,7 +62,8 @@ make it stricter · **trusted-only** — refused in the repository file (it woul
 
 | Key | Type | Default | Trust | Meaning |
 |---|---|---|---|---|
-| `default_agent` | string | `claude` | project-ok | Agent started by the bare dashboard `enter` and used for login hints. |
+| `default_agent` | string | `claude` | project-ok | Agent started by the bare dashboard `enter` and used for login hints; always installed. |
+| `agents` | []string | `[claude]` | project-ok | Agents installed in the box (`claude`, `codex`); `agents = []` in a layer drops the ones below it. In broker mode an agent's API hosts are allowed only when your own config enables it. |
 | `cpus` | int | `4` | project-ok | vCPUs per box; a project may set it, capped against the host. |
 | `memory` | string | `4GiB` | project-ok | RAM ceiling per box (e.g. `4GiB`); the guest never returns memory to the Mac, so this is the eventual cost. Capped against the host. |
 | `disk` | string | `60GiB` | project-ok | Sparse VM disk size; only used blocks cost anything. |
@@ -98,7 +100,7 @@ make it stricter · **trusted-only** — refused in the repository file (it woul
 | `provision` | []string |  | project-ok | Repository scripts run at the end of provisioning as the box user (`# corral: system` for root in full mode); a failure fails the start. |
 | `hide` | []string |  | project-ok | Project paths shown empty inside the box (`.env`, `secrets/`). |
 | `box_dirs` | []string |  | project-ok | Project directories kept on the box disk and bind-mounted over the mount (`node_modules`, `build`): fast installs, empty on the Mac. |
-| `egress` | []string | `[api.anthropic.com *.anthropic.com platform.claude.com]` | trusted-only | Allow-list for `network = "broker"`: exact hosts or `*.suffix`, `:port` to widen beyond 80/443; git_tokens hosts are added automatically. |
+| `egress` | []string |  | trusted-only | Allow-list for `network = "broker"`: exact hosts or `*.suffix`, `:port` to widen beyond 80/443; the API hosts of your enabled agents and the git_tokens hosts are added automatically (`corral egress` shows the result). |
 | `git_tokens` | map[string]config.GitToken |  | trusted-only | `{ "<host>" = "<HOST_VAR>" }` or `{ "<host>" = { token = "<HOST_VAR>", user = "gitlab+deploy-token-<id>" } }`: HTTPS git credential for the box, offered only to that host; the variable may come from `keychain_env`. |
 | `api_brokers` | []config.APIBroker |  | trusted-only | `[[api_brokers]] name, upstream, token, auth (header\|bearer\|basic), header/user, allow = ["METHOD /path/**"]`: a credential-holding proxy on the Mac — the box calls `$CORRAL_API_<NAME>/…`, the Mac adds the token and forwards only allow-listed method+path calls; every call audited. |
 
@@ -156,6 +158,7 @@ What enforces the configuration inside the box (systemd units, re-applied before
 | `HTTP_PROXY / HTTPS_PROXY / NO_PROXY` | In broker mode: the allow-list proxy on the Mac gateway. |
 | `CORRAL_API_<NAME>` | Base URL of an `api_brokers` route (`http://192.168.5.2:<port>/<name>`); the credential is added on the Mac, never present in the box. |
 | `CLAUDE_CONFIG_DIR` | Claude Code state relocated to `/corral/agents/claude`; `DISABLE_AUTOUPDATER=1`. |
+| `CODEX_HOME` | Codex CLI state (config, login, sessions) relocated to `/corral/agents/codex`. |
 
 ## Host layout
 

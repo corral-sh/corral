@@ -54,6 +54,7 @@ func (t Trust) String() string {
 // when a key is added to File without an entry here — that is deliberate.
 var trustTable = map[string]Trust{
 	"default_agent":        ProjectOK,
+	"agents":               ProjectOK, // which agents are installed in the guest; their API hosts join the broker allow-list, their credentials are forwarded only to a session you start with that agent
 	"cpus":                 ProjectOK, // capped against the host, see checkProjectResources
 	"memory":               ProjectOK, // capped
 	"disk":                 ProjectOK,

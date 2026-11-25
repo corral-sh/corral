@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -322,10 +323,52 @@ type Probe struct {
 // reproducible for a given Lima version.
 const GuestImage = "template:_images/ubuntu-24.04"
 
-// Agents returns the agent implementations this box is provisioned with.
-// Today every box gets every registered agent; the registry is the single
-// source of truth for "supported tools".
-func (b *Box) Agents() []agent.Agent { return agent.All() }
+// Agents returns the agent implementations this box is provisioned with:
+// the registered agents named by `agents` (default_agent always among them),
+// sorted by name. Unknown names are skipped here and refused by Render.
+func (b *Box) Agents() []agent.Agent { return EnabledAgents(b.Cfg) }
+
+// EnabledAgents is Agents for a config without a box.
+func EnabledAgents(cfg *config.Config) []agent.Agent {
+	var out []agent.Agent
+	for _, a := range agent.All() {
+		if slices.Contains(cfg.Agents, a.Name()) {
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
+// AgentNames lists the names of the box's agents, for metadata and output.
+func (b *Box) AgentNames() []string {
+	var out []string
+	for _, a := range b.Agents() {
+		out = append(out, a.Name())
+	}
+	return out
+}
+
+// AgentStateFor is where one agent's login lives in this box: agent_state,
+// except that an agent only the repository enabled (not in TrustedAgents) is
+// always isolated — a repo that adds `agents = ["codex"]` must not get your
+// shared Codex login mounted into its box (it would be readable, and in
+// shared mode writable, by the repo's code without you ever starting codex).
+func AgentStateFor(cfg *config.Config, name string) string {
+	if !slices.Contains(cfg.TrustedAgents, name) {
+		return config.AgentStateIsolated
+	}
+	return cfg.AgentState
+}
+
+// checkAgents refuses an agents entry (or default_agent) nothing registered.
+func checkAgents(cfg *config.Config) error {
+	for _, n := range cfg.Agents {
+		if _, ok := agent.Lookup(n); !ok {
+			return fmt.Errorf("unknown agent %q in agents/default_agent (known: %s) — fix ~/.corral/config.toml or the project's .corral.toml", n, strings.Join(agent.Names(), ", "))
+		}
+	}
+	return nil
+}
 
 // Render produces the Lima template for this box.
 func (b *Box) Render() (*Template, error) { return b.render(false) }
@@ -335,6 +378,9 @@ func (b *Box) Render() (*Template, error) { return b.render(false) }
 // project config, only base + toolchains + agents.
 func (b *Box) render(golden bool) (*Template, error) {
 	cfg := b.Cfg
+	if err := checkAgents(cfg); err != nil {
+		return nil, err
+	}
 	t := &Template{
 		MinimumLimaVersion: lima.MinVersion,
 		Base:               []string{GuestImage},
@@ -371,13 +417,18 @@ func (b *Box) render(golden bool) (*Template, error) {
 	// 2. Agent state. shared: the host directory, read-write. seeded: the
 	// host directory read-only at a seed path, copied into the box's own
 	// state dir on first boot (see guest.SeedStateScript). isolated: nothing.
-	if !golden && cfg.AgentState != config.AgentStateIsolated {
+	// Per agent: one only the repository enabled is always isolated.
+	if !golden {
 		for _, a := range b.Agents() {
+			mode := AgentStateFor(cfg, a.Name())
+			if mode == config.AgentStateIsolated {
+				continue
+			}
 			host, err := paths.AgentStateDir(a.Name())
 			if err != nil {
 				return nil, err
 			}
-			if cfg.AgentState == config.AgentStateSeeded {
+			if mode == config.AgentStateSeeded {
 				t.Mounts = append(t.Mounts, Mount{Location: host, MountPoint: agent.SeedDir(a.Name()), Writable: false})
 			} else {
 				t.Mounts = append(t.Mounts, Mount{Location: host, MountPoint: agent.StateDir(a.Name()), Writable: true})
@@ -429,7 +480,7 @@ func (b *Box) render(golden bool) (*Template, error) {
 		for k, v := range a.GuestEnv(agent.StateDir(a.Name())) {
 			env[k] = v
 		}
-		if cfg.AgentState != config.AgentStateShared {
+		if AgentStateFor(cfg, a.Name()) != config.AgentStateShared {
 			// Per-box state lives on the VM disk instead of a host mount.
 			fmt.Fprintf(&wrappers, "install -d -m 0700 -o \"$CORRAL_USER\" %s\n", guest.ShellQuote(agent.StateDir(a.Name())))
 		}
@@ -453,7 +504,7 @@ func (b *Box) render(golden bool) (*Template, error) {
 	// directory (isolated/seeded); before it, a user-mode mkdir under the
 	// root-owned /corral/agents failed and the seed was skipped on first boot.
 	for _, a := range b.Agents() {
-		if cfg.AgentState == config.AgentStateSeeded {
+		if AgentStateFor(cfg, a.Name()) == config.AgentStateSeeded {
 			t.Provision = append(t.Provision, Provision{Mode: "user", Script: guest.SeedStateScript(agent.SeedDir(a.Name()), agent.StateDir(a.Name()))})
 		}
 		if sd, ok := a.(agent.StateSeeder); ok {
@@ -662,7 +713,7 @@ func (b *Box) Create(ctx context.Context, progress lima.Progress) error {
 		Project:         b.Project,
 		CreatedAt:       now,
 		LastUsed:        now,
-		Agents:          agent.Names(),
+		Agents:          b.AgentNames(),
 		Toolchains:      b.Cfg.Toolchains,
 		Packages:        b.Cfg.Packages,
 		ReadonlyProject: b.Cfg.ReadonlyProject,
@@ -693,7 +744,7 @@ func (b *Box) RecoverMeta(ctx context.Context) error {
 	now := time.Now()
 	b.Meta = &Meta{
 		Name: b.Name, Project: b.Project, CreatedAt: now, LastUsed: now,
-		Agents: agent.Names(), Toolchains: b.Cfg.Toolchains, Packages: b.Cfg.Packages,
+		Agents: b.AgentNames(), Toolchains: b.Cfg.Toolchains, Packages: b.Cfg.Packages,
 		ReadonlyProject: b.Cfg.ReadonlyProject, SharedState: b.Cfg.SharedAgentState, AgentState: b.Cfg.AgentState,
 		TemplateHash: hash, CPUs: b.Cfg.CPUs, Memory: b.Cfg.Memory, Disk: b.Cfg.Disk,
 		CorralVersion: b.Version, LimaVersion: limaVer,
@@ -759,11 +810,57 @@ type LaunchSpec struct {
 	Warnings []string
 }
 
+// otherAgentsCredentials are the credential variables of every agent but ag
+// (and not also ag's own): the default forward_env names Claude's, and a
+// codex session must not receive the Anthropic token (nor the reverse).
+// Sessions with no agent (shell, run) keep the whole list.
+func otherAgentsCredentials(ag agent.Agent) map[string]bool {
+	own := map[string]bool{}
+	for _, k := range ag.ForwardEnv() {
+		own[k] = true
+	}
+	out := map[string]bool{}
+	for _, a := range agent.All() {
+		for _, k := range a.ForwardEnv() {
+			if !own[k] {
+				out[k] = true
+			}
+		}
+	}
+	return out
+}
+
+// checkAgentInstalled refuses a session for an agent the box was not built
+// with, naming the config change and the rebuild it takes.
+func (b *Box) checkAgentInstalled(ag agent.Agent) error {
+	if !slices.Contains(b.Cfg.Agents, ag.Name()) {
+		return fmt.Errorf("%s is not installed in box %s (agents = %s) — add %q to agents in ~/.corral/config.toml (every box) or ~/.corral/projects/%s.toml, then `corral rebuild`",
+			ag.Name(), b.Name, strings.Join(b.Cfg.Agents, ", "), ag.Name(), b.Name)
+	}
+	if b.Meta != nil && len(b.Meta.Agents) > 0 && !slices.Contains(b.Meta.Agents, ag.Name()) {
+		return fmt.Errorf("%s is enabled but box %s was built without it — run `corral rebuild` to install it", ag.Name(), b.Name)
+	}
+	return nil
+}
+
 // BuildLaunch resolves the environment for a run. hostEnv is normally
 // os.Environ() as a map; it is injected for tests.
 func (b *Box) BuildLaunch(ag agent.Agent, argv []string, yolo bool, hostEnv map[string]string) (*LaunchSpec, error) {
 	cfg := b.Cfg
 	spec := &LaunchSpec{Env: map[string]string{}, GitEnv: map[string]string{}, Workdir: b.GuestPath()}
+	if ag != nil {
+		if err := b.checkAgentInstalled(ag); err != nil {
+			return nil, err
+		}
+		if !slices.Contains(cfg.TrustedAgents, ag.Name()) {
+			broker := ""
+			if cfg.Network == config.NetworkBroker {
+				broker = fmt.Sprintf(", and in broker mode its API hosts (%s) are not allowed", strings.Join(ag.EgressHosts(), ", "))
+			}
+			spec.Warnings = append(spec.Warnings, fmt.Sprintf("%s was enabled by the project's %s, so it has its own empty login in this box (not ~/.corral/agents/%s)%s — add agents = [%q] to ~/.corral/projects/%s.toml if you agree, then `corral rebuild`",
+				ag.Name(), config.ProjectFileName, ag.Name(), broker, ag.Name(), b.Name))
+		}
+	}
 
 	// env_file: consulted after the exported host environment and
 	// before the Keychain, for hosts with no login session. From here on
@@ -842,11 +939,13 @@ func (b *Box) BuildLaunch(ag agent.Agent, argv []string, yolo bool, hostEnv map[
 	}
 	if !cfg.NoEnvPassthrough {
 		keys := append([]string{}, cfg.ForwardEnv...)
+		var foreign map[string]bool
 		if ag != nil {
 			keys = append(keys, ag.ForwardEnv()...)
+			foreign = otherAgentsCredentials(ag)
 		}
 		for _, k := range keys {
-			if aliased[k] {
+			if aliased[k] || foreign[k] {
 				continue
 			}
 			if _, set := spec.Env[k]; set { // includes keychain_env

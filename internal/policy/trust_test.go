@@ -224,8 +224,39 @@ func TestNetworkTightenOrderAndEgressTrustedOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !contains(cfg.Egress, "registry.npmjs.org:443") || !contains(cfg.Egress, "api.anthropic.com") {
-		t.Fatalf("egress = %v", cfg.Egress)
+	if !contains(cfg.Egress, "registry.npmjs.org:443") || !contains(cfg.TrustedAgents, "claude") {
+		t.Fatalf("egress = %v, trusted agents = %v", cfg.Egress, cfg.TrustedAgents)
+	}
+}
+
+// a repo may install an agent, but only the user's own layers decide
+// whether its API hosts are reachable (box.EgressHosts uses TrustedAgents).
+func TestProjectAgentsInstallButAreNotTrusted(t *testing.T) {
+	dir := t.TempDir()
+	global := filepath.Join(dir, "config.toml")
+	proj := t.TempDir()
+	write := func(p, s string) {
+		if err := os.WriteFile(p, []byte(s), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(global, "")
+	write(filepath.Join(proj, config.ProjectFileName), "agents = [\"codex\"]\n")
+	cfg, err := Load(global, "", proj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !contains(cfg.Agents, "codex") || contains(cfg.TrustedAgents, "codex") || !contains(cfg.TrustedAgents, "claude") {
+		t.Fatalf("project agents: agents = %v, trusted = %v", cfg.Agents, cfg.TrustedAgents)
+	}
+	write(filepath.Join(proj, config.ProjectFileName), "default_agent = \"codex\"\n")
+	if cfg, err = Load(global, "", proj); err != nil || contains(cfg.TrustedAgents, "codex") {
+		t.Fatalf("project default_agent must not trust codex: %v %v", cfg, err)
+	}
+	host := filepath.Join(dir, "host.toml")
+	write(host, "agents = [\"codex\"]\n")
+	if cfg, err = Load(global, host, proj); err != nil || !contains(cfg.TrustedAgents, "codex") {
+		t.Fatalf("host file enables codex: %v %v", cfg, err)
 	}
 }
 

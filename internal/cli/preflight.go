@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/corral-sh/corral/internal/box"
@@ -57,7 +58,7 @@ func boxPreflight(ctx context.Context, b *box.Box, hostEnv map[string]string) []
 		detail := firstLine(o)
 		if v, pinned := b.Cfg.ToolchainVersions[tc]; pinned {
 			version, _ := config.SplitToolchainVersion(v)
-			if !strings.Contains(o, version) {
+			if !hasVersion(o, version) {
 				ok = false
 			}
 			detail += "  (pinned " + version + ")"
@@ -258,4 +259,11 @@ func runBoxDoctor(ctx context.Context, b *box.Box, asJSON bool) error {
 		ui.Success(os.Stdout, "everything this project declared works from inside the box")
 	}
 	return nil
+}
+
+// hasVersion reports whether a toolchain's --version output names exactly this
+// release: "go1.25.1" must not satisfy a pin of 1.25 nor "go1.25.14" one of
+// 1.25.1. A version is delimited by anything but a digit or a dot.
+func hasVersion(output, version string) bool {
+	return regexp.MustCompile(`(^|[^0-9.])` + regexp.QuoteMeta(version) + `($|[^0-9.])`).MatchString(output)
 }

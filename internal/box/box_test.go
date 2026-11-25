@@ -844,6 +844,25 @@ func TestToolchainVersionsShapeGolden(t *testing.T) {
 	if !found {
 		t.Error("flutter script must receive the pinned version and commit")
 	}
+	// node and go take the same path.
+	ng := testBox(t, config.File{Toolchains: []string{"node", "go"}, ToolchainVersions: map[string]string{"node": "22.23.2", "go": "1.25.14"}})
+	n3, _ := ng.GoldenName()
+	n4, _ := testBox(t, config.File{Toolchains: []string{"node", "go"}}).GoldenName()
+	if n3 == n4 {
+		t.Error("pinned node/go must produce their own golden")
+	}
+	tpl, err = ng.Render()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var node, goPin bool
+	for _, p := range tpl.Provision {
+		node = node || strings.Contains(p.Script, "export CORRAL_NODE_VERSION=22.23.2\n")
+		goPin = goPin || strings.Contains(p.Script, "export CORRAL_GO_VERSION=1.25.14\n")
+	}
+	if !node || !goPin {
+		t.Errorf("node/go scripts must receive the pin (node %v, go %v)", node, goPin)
+	}
 	if v, c := config.SplitToolchainVersion("3.44.2"); v != "3.44.2" || c != "" {
 		t.Errorf("split without commit: %q %q", v, c)
 	}

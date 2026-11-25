@@ -64,7 +64,7 @@ type File struct {
 	Timeout            *string             `toml:"timeout,omitempty"`        // default `run --timeout`: bound a session, exit 124
 	Packages           []string            `toml:"packages,omitempty"`
 	Toolchains         []string            `toml:"toolchains,omitempty"`
-	ToolchainVersions  map[string]string   `toml:"toolchain_versions,omitempty"` // { flutter = "3.44.2[@<commit>]" }; part of the golden identity
+	ToolchainVersions  map[string]string   `toml:"toolchain_versions,omitempty"` // { flutter = "3.44.2[@<commit>]", node = "22.23.2", go = "1.25.14" }; part of the golden identity
 	Mounts             []string            `toml:"mounts,omitempty"`
 	Provision          []string            `toml:"provision,omitempty"`
 	Hide               []string            `toml:"hide,omitempty"`
@@ -332,11 +332,21 @@ func ProfileRank(p string) int {
 var KnownToolchains = []string{"node", "go", "python", "docker", "java", "android", "flutter"}
 
 // VersionedToolchains are the toolchains whose version `toolchain_versions`
-// may pin. The others install a release the script pins and verifies.
-var VersionedToolchains = []string{"flutter"}
+// may pin: flutter, node and go. Of the others, android's script pins its
+// own release; python, docker and java come from Ubuntu apt.
+var VersionedToolchains = []string{"flutter", "node", "go"}
 
-// toolchainVersionRe: a release like 3.44.2, optionally @<40-hex commit>.
-var toolchainVersionRe = regexp.MustCompile(`^[0-9][A-Za-z0-9.+-]{0,63}(@[0-9a-f]{40})?$`)
+// toolchainVersionForm is the shape each pinnable toolchain's value must have,
+// with an example for the error message. Only flutter takes @<commit>: a git
+// commit is the one checksum that is the same on every architecture.
+var toolchainVersionForm = map[string]struct {
+	re      *regexp.Regexp
+	example string
+}{
+	"flutter": {regexp.MustCompile(`^[0-9][A-Za-z0-9.+-]{0,63}(@[0-9a-f]{40})?$`), `a release like 3.44.2, optionally @<40-hex commit>`},
+	"node":    {regexp.MustCompile(`^[0-9]{1,3}\.[0-9]{1,4}\.[0-9]{1,4}$`), `an exact release like 22.23.2 (no "v", no major-only)`},
+	"go":      {regexp.MustCompile(`^[0-9]{1,3}\.[0-9]{1,4}(\.[0-9]{1,4})?$`), `a release like 1.25.14 (no "go" prefix)`},
+}
 
 // SplitToolchainVersion separates "3.44.2@<commit>" into its parts.
 func SplitToolchainVersion(v string) (version, commit string) {
@@ -707,10 +717,10 @@ func Resolve(f File) (*Config, error) {
 	}
 	for tc, v := range c.ToolchainVersions {
 		if !contains(VersionedToolchains, tc) {
-			return nil, fmt.Errorf("toolchain_versions[%q]: only %s can be pinned (the other toolchains install a release the script pins and verifies)", tc, strings.Join(VersionedToolchains, ", "))
+			return nil, fmt.Errorf("toolchain_versions[%q]: only %s can be pinned (android's script pins its own release; python, docker and java come from Ubuntu apt)", tc, strings.Join(VersionedToolchains, ", "))
 		}
-		if !toolchainVersionRe.MatchString(v) {
-			return nil, fmt.Errorf("toolchain_versions[%q] = %q must be a release like 3.44.2, optionally @<40-hex commit>", tc, v)
+		if f := toolchainVersionForm[tc]; !f.re.MatchString(v) {
+			return nil, fmt.Errorf("toolchain_versions[%q] = %q must be %s", tc, v, f.example)
 		}
 	}
 	seenAPI := map[string]bool{}

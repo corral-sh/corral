@@ -175,6 +175,14 @@ set on the Mac, provision scripts of this boot. Exit status is non-zero when any
 				if err != nil {
 					return err
 				}
+				// openBoxByName falls back to defaults on a config error so
+				// lifecycle commands still work; a preflight against those
+				// defaults would pass for a project whose config `run` refuses.
+				if _, statErr := os.Stat(b.Project); len(args) == 1 && statErr == nil {
+					if _, err := loadConfig(b.Project, b.Name); err != nil {
+						return fmt.Errorf("%s's configuration does not load, so there is nothing to preflight: %w (see `corral -C %s config`)", b.Name, err, b.Project)
+					}
+				}
 				return runBoxDoctor(cmd.Context(), b, asJSON)
 			}
 			ui.Banner(os.Stdout, Version)
@@ -625,7 +633,7 @@ const projectTemplate = `# Corral project configuration. Commit this file so the
 
 # Toolchains installed into the box: node, go, python, docker.
 # toolchains = ["node", "go"]      # [] installs none — the default node is dropped
-# toolchain_versions = { flutter = "3.44.2" }   # pin a release (or "3.44.2@<commit>"); its own golden image
+# toolchain_versions = { node = "22.23.2", go = "1.25.14" }   # pin releases (flutter: "3.44.2[@<commit>]"); its own golden image
 
 # Run amd64 binaries and docker --platform linux/amd64 inside the arm64
 # box via Rosetta 2 (Apple Silicon only; needs a rebuild).

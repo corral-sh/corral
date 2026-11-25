@@ -30,7 +30,12 @@ func TestValidation(t *testing.T) {
 		"gittoken":  {GitTokens: map[string]GitToken{"host": {Token: "not valid"}}},
 		"gituser":   {GitTokens: map[string]GitToken{"host": {Token: "TOK", User: "bad user\n"}}},
 		"reserve":   {MemoryReserve: ptr("lots")},
-		"tcver-key": {ToolchainVersions: map[string]string{"node": "22"}},
+		"tcver-key": {ToolchainVersions: map[string]string{"python": "3.12"}},
+		"tcver-maj": {ToolchainVersions: map[string]string{"node": "22"}},
+		"tcver-v":   {ToolchainVersions: map[string]string{"node": "v22.23.2"}},
+		"tcver-nsh": {ToolchainVersions: map[string]string{"node": "22.23.2@0123456789abcdef0123456789abcdef01234567"}},
+		"tcver-go":  {ToolchainVersions: map[string]string{"go": "go1.25.14"}},
+		"tcver-inj": {ToolchainVersions: map[string]string{"go": "1.25.14 && curl x"}},
 		"tcver-val": {ToolchainVersions: map[string]string{"flutter": "latest; rm -rf /"}},
 		"tcver-sha": {ToolchainVersions: map[string]string{"flutter": "3.44.2@abc"}},
 		"api-name":  {APIBrokers: []APIBroker{{Name: "Git Lab", Upstream: "https://x", Token: "T", Header: "H", Allow: []string{"GET /"}}}},
@@ -47,6 +52,19 @@ func TestValidation(t *testing.T) {
 	for name, f := range cases {
 		if _, err := Resolve(Merge(Defaults(), f)); err == nil {
 			t.Errorf("%s: expected validation error", name)
+		}
+	}
+}
+
+// node and go are pinnable like flutter; the accepted shapes.
+func TestToolchainVersionsAccepted(t *testing.T) {
+	for _, v := range []map[string]string{
+		{"node": "22.23.2", "go": "1.25.14"},
+		{"go": "1.20"},
+		{"flutter": "3.44.2@0123456789abcdef0123456789abcdef01234567"},
+	} {
+		if _, err := Resolve(Merge(Defaults(), File{ToolchainVersions: v})); err != nil {
+			t.Errorf("%v: %v", v, err)
 		}
 	}
 }

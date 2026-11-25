@@ -1024,6 +1024,14 @@ func TestRenderDropsPrivilegesBeforeProjectScripts(t *testing.T) {
 			t.Errorf("%s lockdown must call corral-drop-privileges before every session", name)
 		}
 	}
+	// Broker mode closes DNS, which makes systemd-resolved spin; the lockdown
+	// stops it for this boot only, so the next boot's provisioning resolves.
+	if s := guest.Script("broker"); !strings.Contains(s, "systemctl mask --runtime --now systemd-resolved.service") || !strings.Contains(s, "127.0.1.1") {
+		t.Error("broker lockdown must runtime-mask systemd-resolved and keep the hostname resolvable")
+	}
+	if strings.Contains(guest.Script("offline"), "systemd-resolved") {
+		t.Error("offline mode keeps DNS to the gateway; it must not stop the resolver")
+	}
 	if s := guest.Script("drop-privileges"); !strings.Contains(s, "docker") || !strings.Contains(s, "exit 1") {
 		t.Error("drop-privileges must cover the docker group and fail closed")
 	}

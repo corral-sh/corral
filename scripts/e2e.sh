@@ -62,6 +62,9 @@ check "broker: allowed host reachable through the proxy" 'c=$(guest "$A" "curl -
 check "broker: denied host refused by the proxy (403 on CONNECT)" 'guest "$A" "curl -s -o /dev/null --max-time 20 https://example.com/; echo exit=\$?" | grep -q exit=56'
 check "broker: direct connection bypassing the proxy is rejected" 'guest "$A" "curl -s -o /dev/null --noproxy \"*\" --max-time 8 https://1.1.1.1/; echo exit=\$?" | grep -qE "exit=(7|28)"'
 check "broker: DNS is not available in the guest"       '! guest "$A" "getent hosts example.com" >/dev/null 2>&1'
+check "broker: a lookup fails at once, not after a resolver timeout" 'guest "$A" "s=\$(date +%s); getent hosts example.com; echo took=\$((\$(date +%s)-s))" | grep -qE "took=[01]$"'
+check "broker: systemd-resolved is stopped (it spins on closed DNS)" 'guest "$A" "systemctl is-active systemd-resolved; true" | grep -qx inactive'
+check "broker: the box resolves its own hostname"      'guest "$A" "getent hosts \$(hostname)" | grep -q .'
 check "sudo removed from the box user"                  '! guest "$A" "sudo -n true" >/dev/null 2>&1'
 check "box user is not in the docker group"            '! guest "$A" "id -nG" | tr " " "\n" | grep -qx docker'
 check "the docker daemon refuses the box user"         '! guest "$A" "docker info" >/dev/null 2>&1'
@@ -83,6 +86,7 @@ check "session start from stopped takes an auto snapshot" 'guest "$A" true >/dev
 check "undo restores the newest auto snapshot"          '"$BIN" -C "$A" undo'
 check "box boots to a ready session after undo"    'guest "$A" "echo up-after-undo" | grep -q up-after-undo'
 check "broker lockdown active again after the restore"   'guest "$A" "systemctl is-active corral-broker.service" | grep -qx active'
+check "broker: resolved stopped again after the reboot"  'guest "$A" "systemctl is-active systemd-resolved; true" | grep -qx inactive'
 
 # ── Box B: offline
 B="$WORK/beta"; export B

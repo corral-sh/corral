@@ -254,7 +254,9 @@ to keeping credentials out of the box altogether.
   after 14 days. Names only, never payloads.
 * **Guest.** `broker.sh` (from `offline.sh`): ruleset accepts `lo`,
   established, `ip daddr 192.168.5.2 tcp dport <port>`; rejects all else
-  (DNS included). `/etc/profile.d/corral.sh` and `/etc/environment` set
+  (DNS included; `systemd-resolved` is runtime-masked by the lockdown, since it
+  spins at ~100% CPU on closed DNS, and the box's hostname goes into `/etc/hosts`).
+  `/etc/profile.d/corral.sh` and `/etc/environment` set
   `HTTP_PROXY=HTTPS_PROXY=http://192.168.5.2:<port>`, `NO_PROXY=localhost,
   127.0.0.1,192.168.5.0/24`; apt gets `Acquire::http::Proxy`. Sudo removed,
   scoped `systemctl restart corral-broker` kept. Provisioning still runs

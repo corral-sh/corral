@@ -16,7 +16,7 @@ import (
 
 // Palette — amber for the corral, slate for structure, green/red for state.
 var (
-	Amber  = lipgloss.AdaptiveColor{Light: "#B45309", Dark: "#F59E0B"}
+	Amber  = lipgloss.AdaptiveColor{Light: "#B45309", Dark: "#FFB224"} // dark: the site's ember
 	Gold   = lipgloss.AdaptiveColor{Light: "#92400E", Dark: "#FCD34D"}
 	Slate  = lipgloss.AdaptiveColor{Light: "#475569", Dark: "#94A3B8"}
 	Dim    = lipgloss.AdaptiveColor{Light: "#64748B", Dark: "#64748B"}

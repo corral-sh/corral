@@ -137,7 +137,7 @@ EOF
 # MOTD
 cat >/etc/update-motd.d/01-corral <<'EOF'
 #!/bin/sh
-printf '\n  \033[1;33m🐎 Corral\033[0m  — you are inside an isolated VM. Your Mac home directory is not here.\n'
+printf '\n  \033[1;33m✦ Corral\033[0m  — you are inside an isolated VM. Your Mac home directory is not here.\n'
 printf '  Project: %s\n' "${CORRAL_PROJECT:-see /corral/runtime/context.json}"
 if [ -f /etc/corral/broker.conf ]; then
   printf '  \033[1;33mNetwork: broker\033[0m — egress only to the allow-list on your Mac (HTTP(S)_PROXY set), sudo removed. Blocked? `corral egress` on the Mac.\n'

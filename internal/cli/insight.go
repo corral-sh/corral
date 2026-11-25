@@ -82,7 +82,7 @@ func hostChecks(ctx context.Context) []check {
 			if !lima.Tested(v) {
 				detail = v + " — Corral is tested with " + lima.TestedVersion + "; the guest OS image is pinned per Lima release"
 			}
-			out = append(out, check{"Tested Lima release", lima.Tested(v), detail, "brew install " + lima.PinnedFormula})
+			out = append(out, check{"Tested Lima release", lima.Tested(v), detail, untestedLimaRemedy(v)})
 		}
 	}
 
@@ -997,4 +997,15 @@ func parseSizeGiB(s string) (float64, bool) {
 		f /= 1024
 	}
 	return f, true
+}
+
+// untestedLimaRemedy is doctor's fix line for a Lima release other than the
+// tested one. An older one can be upgraded; Homebrew offers no older Lima, so
+// for a newer one there is nothing to run — say so instead of naming a
+// command that changes nothing.
+func untestedLimaRemedy(have string) string {
+	if !lima.VersionAtLeast(have, lima.TestedVersion) {
+		return "brew upgrade " + lima.PinnedFormula
+	}
+	return "nothing to run — a newer Lima usually works; if a box misbehaves, open an issue at https://github.com/corral-sh/corral/issues with `limactl --version` and `corral doctor <box>`"
 }

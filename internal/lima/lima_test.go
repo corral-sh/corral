@@ -52,7 +52,7 @@ func TestShellQuote(t *testing.T) {
 }
 
 func TestTested(t *testing.T) {
-	for v, want := range map[string]bool{"2.2.0": true, "2.2.5": true, "limactl version 2.2.0": true, "2.3.0": false, "1.0.0": false, "": false} {
+	for v, want := range map[string]bool{"2.3.0": true, "2.3.5": true, "limactl version 2.3.0": true, "2.2.0": false, "2.4.0": false, "1.0.0": false, "": false} {
 		if got := Tested(v); got != want {
 			t.Errorf("Tested(%q) = %v", v, got)
 		}

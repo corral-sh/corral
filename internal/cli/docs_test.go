@@ -61,3 +61,13 @@ func TestFeaturesCatalogUpToDate(t *testing.T) {
 		t.Errorf("catalog looks incomplete: %d commands, %d keys", len(c.Commands), len(c.Config))
 	}
 }
+
+// doctor never suggests a command that cannot fix an untested Lima.
+func TestUntestedLimaRemedy(t *testing.T) {
+	if got := untestedLimaRemedy("1.9.0"); got != "brew upgrade lima" {
+		t.Errorf("older Lima: %q", got)
+	}
+	if got := untestedLimaRemedy("9.0.0"); strings.HasPrefix(got, "brew") || !strings.Contains(got, "issues") {
+		t.Errorf("newer Lima: %q", got)
+	}
+}

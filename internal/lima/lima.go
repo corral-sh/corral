@@ -29,7 +29,7 @@ const MinVersion = "1.0.0"
 // Lima can silently mean a different guest; `corral doctor` reports an
 // advisory when the installed release is not the tested one.
 const (
-	TestedVersion = "2.2.0"
+	TestedVersion = "2.3.0"
 	PinnedFormula = "lima"
 )
 
